@@ -106,10 +106,25 @@ def test_simu_vanaf_tot_en_te_weinig():
     def wim_ochtend(b):
         b["Simu"][5][3] = "12:00"
     r = plan(wijzig=wim_ochtend)
-    assert any("4 simucliënt(en) beschikbaar voor 5 lokalen" in m[1] for m in r["meldingen"])
-    assert not [x for x in rijen(r) if x["simucliënt"] == "Wout" and x["Tijd"] * 1440 >= 700]
+    wim = [x for x in rijen(r) if x["simucliënt"] == "Wout"]
+    assert wim and all(round(x["Eindtijd"] * 1440) <= 720 for x in wim)  # per slot binnen Vanaf/Tot
+    assert any(tijd(x["Tijd"]) == "11:45" for x in wim)  # 11:45-12:00 past nog
+    assert sum("4 simucliënt(en) beschikbaar voor 5 lokalen" in m[1] for m in r["meldingen"]) == 2  # middagblokken
+
+
+def test_simus_later_dan_eerste_toets_dubbel_en_andere_datum():
+    """Zoals een echte invoerfout: simu's vanaf 10:00 terwijl de eerste toets 09:40 is, en twee namen dubbel."""
+    def invoer(b):
+        b["Simu"] = [b["Simu"][0]] + [[mv.TOETS, n, "10:00", "17:00"] for n in ("Siem", "Tom", "Uma", "Vera", "Wout", "Siem")]
+    r = plan(wijzig=invoer)
     alle = rijen(r)
-    assert sum(x["bijzheden"] == rc.VRIJ for x in alle) == 24 - 12  # 3 blokken één lokaal minder
+    assert not [x for x in alle if tijd(x["Tijd"]) == "09:40"]  # om 09:40 is nog geen simu
+    assert {tijd(x["Tijd"]) for x in alle if x["Lokaal"] == "C1.39"} >= {"10:00", "11:00", "11:45"}
+    assert any("Siem staat al eerder op 14-04-2026" in m[1] for m in r["meldingen"])
+    assert any("5 slot(s) zonder beschikbare simucliënt" in m[1] for m in r["meldingen"])
+    assert sum(x["bijzheden"] != rc.VRIJ for x in alle) == 61
+    r = plan("her", invoer)  # herkansing op 27-05: geen simu's die dag
+    assert any("Geen simucliënten voor 27-05-2026" in m[1] and "14-04-2026" in m[1] for m in r["meldingen"])
 
 
 def test_meerdere_pauzes_en_casus_na_pauze():

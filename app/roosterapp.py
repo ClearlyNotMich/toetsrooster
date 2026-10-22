@@ -1,4 +1,4 @@
-"""OWB Toetsrooster — desktop-app (Qt6). Start: dubbelklik op het programma.
+"""Toetsrooster — desktop-app (Qt6). Start: dubbelklik op het programma.
 
 Leest dezelfde Excel-werkmap als de Office Scripts en gebruikt dezelfde logica
 (rooster_core.py). Het origineel wordt nooit overschreven: het resultaat wordt
@@ -99,7 +99,7 @@ def pagina(titel: str, uitleg: str) -> tuple[QWidget, QVBoxLayout, QHBoxLayout]:
 class Venster(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("OWB Toetsrooster")
+        self.setWindowTitle("Toetsrooster")
         self.resize(1280, 820)
         self.setMinimumSize(1020, 640)
         self.pad: str | None = None
@@ -134,15 +134,11 @@ class Venster(QMainWindow):
         lay.setSpacing(4)
         merk = QHBoxLayout()
         merk.setSpacing(10)
-        m = label("OT", "merk")
+        m = label("T", "merk")
         m.setFixedSize(28, 28)
         m.setAlignment(Qt.AlignCenter)
         merk.addWidget(m)
-        naam = QVBoxLayout()
-        naam.setSpacing(0)
-        naam.addWidget(label("Toetsrooster", "appnaam"))
-        naam.addWidget(label("OWB", "uitleg"))
-        merk.addLayout(naam, 1)
+        merk.addWidget(label("Toetsrooster", "appnaam"), 1)
         lay.addLayout(merk)
         lay.addSpacing(18)
         lay.addWidget(label("MENU", "sectie"))

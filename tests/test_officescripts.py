@@ -138,7 +138,15 @@ def dag_datumtekst():
     return b
 
 
+def dag_simu_invoerfouten():
+    b = mv.dag_bladen()
+    b["Simu"] = [b["Simu"][0]] + [[mv.TOETS, n, "10:00", "17:00"] for n in ("Siem", "Tom", "Uma", "Vera", "Wout", "Siem", "Tom")]
+    b["Simu"].append([mv.HER + 1, "Xan", "", ""])
+    return b
+
+
 SCENARIOS = {
+    "dag_simu_invoerfouten": dag_simu_invoerfouten,
     "dag_datumtekst": dag_datumtekst,
     "dag": mv.dag_bladen,
     "dag_anders": dag_met(simu_rotatie="Nee", casus_na="Na elke pauze afwisselen", ttv_plek="Zo vroeg mogelijk",

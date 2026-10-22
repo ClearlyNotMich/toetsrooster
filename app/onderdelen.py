@@ -34,7 +34,7 @@ class Schakelaar(QAbstractButton):
         self.setCursor(Qt.PointingHandCursor)
         self.setFixedSize(36, 20)
         self._pos = 0.0
-        self._anim = QPropertyAnimation(self, b"pos", self, duration=120, easingCurve=QEasingCurve.OutCubic)
+        self._anim = QPropertyAnimation(self, b"voortgang", self, duration=120, easingCurve=QEasingCurve.OutCubic)
         self.toggled.connect(self._beweeg)
 
     def _beweeg(self, aan: bool):
@@ -55,7 +55,8 @@ class Schakelaar(QAbstractButton):
         self._pos = v
         self.update()
 
-    pos = Property(float, _get_pos, _set_pos)
+    # Niet "pos" noemen: dat is QWidget.pos (de plek van de knop) en dan schuift de hele schakelaar weg.
+    voortgang = Property(float, _get_pos, _set_pos)
 
     def sizeHint(self):  # noqa: N802
         return QSize(36, 20)

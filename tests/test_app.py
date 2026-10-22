@@ -140,7 +140,7 @@ def test_simus_importeren_en_opslaan(tmp_path):
     assert [r[1] for r in simu[1:] if r[0] == mv.TOETS] == ["Siem", "Uma", "Vera"]
     assert [r[1] for r in simu[1:] if r[0] == mv.HER] == ["Siem", "Tom", "Uma"]  # andere dag blijft staan
     r = v.maak()
-    assert r["fouten"] == [] and any("1 simucliënt(en) beschikbaar voor 5 lokalen" in m[1] for m in r["meldingen"])  # 11:45-13:00 alleen Siem
+    assert r["fouten"] == [] and any("11:45-13:00: 2 simucliënt(en) beschikbaar voor 5 lokalen" in m[1] for m in r["meldingen"])  # Siem + Uma (tot 12:15)
     uit = rc.lees_werkmap(v.opslaan(str(tmp_path / "uit.xlsx")))
     assert [r[1] for r in uit["Simu"][1:] if r[0] == mv.TOETS] == ["Siem", "Uma", "Vera"]
     assert rc.naar_minuten(next(r for r in uit["Simu"][1:] if r[1] == "Uma" and r[0] == mv.TOETS)[3]) == 735

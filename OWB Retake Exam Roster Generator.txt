@@ -668,7 +668,7 @@ function leesToetsdag(matrix: Matrix, blad: string, tijden: number[], fouten: st
 }
 
 // Blad Simu zonder kolom Tijd: één rij per simucliënt per dag (Datum leeg = elke dag), met Vanaf/Tot.
-function leesSimuDag(matrix: Matrix, blad: string, fouten: string[]): SimuDag[] {
+function leesSimuDag(matrix: Matrix, blad: string, fouten: string[], meldingen: Cel[][]): SimuDag[] {
     const kop: Cel[] = matrix[0];
     const kn: number = kolom(kop, ["simuclint", "simu", "simulant", "naam"]);
     const kd: number = kolom(kop, ["datum"]);
@@ -693,14 +693,21 @@ function leesSimuDag(matrix: Matrix, blad: string, fouten: string[]): SimuDag[] 
                 `(datum ${DATUM_VOORBEELD}).`);
             continue;
         }
+        if (lijst.some((x: SimuDag) => norm(x.naam) === norm(naam) && x.d === d)) {
+            meldingen.push(["Waarschuwing", `Blad '${blad}' rij ${i + 1}: ${naam} staat al eerder op ` +
+                `${d !== null ? datumTekst(d) : "elke dag"}; telt maar één keer.`]);
+            continue;
+        }
         lijst.push({ naam: naam, d: d, van: van, tot: tot });
     }
     return lijst;
 }
 
-// Simu per slot: in blok b (na b pauzes) krijgt lokaal k van die dag simu (k + b) mod n.
+// Simu per slot. In blok b (na b pauzes) krijgt lokaal k van die dag bij voorkeur simu (k + b) mod n, uit
+// iedereen die in dat blok werkt; per slot telt alleen wie dan volgens Vanaf/Tot beschikbaar is.
 function simuRotatie(slots: Slot[], simus: SimuDag[], pz: number[][], duur: number, rotatie: boolean, meldingen: Cel[][]): Map<string, Persoon[]> {
     const blok = (t: number): number => pz.filter((p: number[]) => p[1] <= t).length;
+    const kan = (x: SimuDag, a: number, e: number): boolean => (x.van === null || x.van <= a) && (x.tot === null || x.tot >= e);
     const kamers: Map<number, string[]> = new Map<number, string[]>();
     const bereik: Map<string, Bereik> = new Map<string, Bereik>();
     for (const slot of slots) {
@@ -722,30 +729,53 @@ function simuRotatie(slots: Slot[], simus: SimuDag[], pz: number[][], duur: numb
         x.a = Math.min(x.a, slot.t);
         x.e = Math.max(x.e, slot.t + duur);
     }
-    const gekozen: Map<string, string[]> = new Map<string, string[]>();
+    kamers.forEach((_: string[], d: number) => {
+        if (!simus.some((x: SimuDag) => x.d === null || x.d === d)) {
+            const andere: string[] = [];
+            simus.slice().sort((a: SimuDag, b: SimuDag) => (a.d as number) - (b.d as number)).forEach((x: SimuDag) => {
+                if (x.d !== null && andere.indexOf(datumTekst(x.d)) < 0) {
+                    andere.push(datumTekst(x.d));
+                }
+            });
+            meldingen.push(["Waarschuwing", `Geen simucliënten voor ${datumTekst(d)} in het blad Simu` +
+                (andere.length > 0 ? ` (er staan er wel voor ${andere.join(", ")}).` : ".")]);
+        }
+    });
+    const gekozen: Map<string, SimuDag[]> = new Map<string, SimuDag[]>();
     bereik.forEach((x: Bereik, sleutel: string) => {
-        const geschikt: string[] = [];
+        const geschikt: SimuDag[] = [];
         for (const y of simus) {
-            if ((y.d === null || y.d === x.d) && (y.van === null || y.van <= x.a)
-                && (y.tot === null || y.tot >= x.e) && geschikt.indexOf(y.naam) < 0) {
-                geschikt.push(y.naam);
+            const werkt: boolean = (y.van === null || y.van < x.e) && (y.tot === null || y.tot > x.a);
+            if ((y.d === null || y.d === x.d) && werkt && !geschikt.some((z: SimuDag) => z.naam === y.naam)) {
+                geschikt.push(y);
             }
         }
-        if (geschikt.length < x.ks.length) {
+        if (geschikt.length > 0 && geschikt.length < x.ks.length) {
             meldingen.push(["Waarschuwing", `${datumTekst(x.d)} ${tijdTekst(x.a)}-${tijdTekst(x.e)}: ${geschikt.length} ` +
                 `simucliënt(en) beschikbaar voor ${x.ks.length} lokalen; niet elk lokaal kan dan draaien.`]);
         }
         gekozen.set(sleutel, geschikt);
     });
     const uit: Map<string, Persoon[]> = new Map<string, Persoon[]>();
+    let zonder: number = 0;
     for (const slot of slots) {
         const b: number = blok(slot.t);
-        const g: string[] = gekozen.get(`${slot.d}_${b}`) as string[];
-        if (g.length > 0) {
-            const k: number = ((kamers.get(slot.d) as string[]).indexOf(norm(slot.lokaal)) + (rotatie ? b : 0)) % g.length;
-            uit.set(`${slot.d}_${slot.t}_${norm(slot.lokaal)}`,
-                g.slice(k).concat(g.slice(0, k)).map((naam: string) => ({ naam: naam, casus: "", lokaal: "" })));
+        const g: SimuDag[] = gekozen.get(`${slot.d}_${b}`) as SimuDag[];
+        const k: number = g.length > 0
+            ? ((kamers.get(slot.d) as string[]).indexOf(norm(slot.lokaal)) + (rotatie ? b : 0)) % g.length : 0;
+        const lijst: Persoon[] = g.slice(k).concat(g.slice(0, k)).filter((x: SimuDag) => kan(x, slot.t, slot.t + duur))
+            .map((x: SimuDag) => ({ naam: x.naam, casus: "", lokaal: "" }));
+        if (lijst.length > 0) {
+            uit.set(`${slot.d}_${slot.t}_${norm(slot.lokaal)}`, lijst);
+        } else {
+            zonder++;
         }
+    }
+    let ietsGekozen: boolean = false;
+    gekozen.forEach((g: SimuDag[]) => { ietsGekozen = ietsGekozen || g.length > 0; });
+    if (zonder > 0 && ietsGekozen) {
+        meldingen.push(["Info", `${zonder} slot(s) zonder beschikbare simucliënt (bijv. vóór 'Vanaf' of na 'Tot' in ` +
+            "het blad Simu); daar wordt niemand ingeroosterd."]);
     }
     return uit;
 }
@@ -796,7 +826,7 @@ function maakRooster(bladen: Map<string, Matrix>, modus: string): Resultaat {
     let simuDag: SimuDag[] | null = null;
     let simus: Map<string, Persoon[]> = new Map<string, Persoon[]>();
     if (simuBlad && simuBlad.length > 0 && kolom(simuBlad[0], ["tijd"]) < 0) {
-        simuDag = leesSimuDag(simuBlad, txt("blad_simu"), fouten);
+        simuDag = leesSimuDag(simuBlad, txt("blad_simu"), fouten, meldingen);
     } else {
         simus = leesBeschikbaar(simuBlad, txt("blad_simu"), ["simuclint", "simu", "simulant", "naam"], fouten);
     }

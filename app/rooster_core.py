@@ -472,7 +472,7 @@ def lees_toetsdag(matrix: list, blad: str, s: dict, fouten: list) -> tuple[list,
     return slots, beo
 
 
-def lees_simu_dag(matrix: list, blad: str, fouten: list) -> list:
+def lees_simu_dag(matrix: list, blad: str, fouten: list, meldingen: list) -> list:
     """Blad Simu zonder kolom Tijd: één rij per simucliënt per dag (Datum leeg = elke dag), met Vanaf/Tot."""
     kop = list(matrix[0])
     kn, kd = kolom(kop, "simuclint", "simu", "simulant", "naam"), kolom(kop, "datum")
@@ -492,13 +492,20 @@ def lees_simu_dag(matrix: list, blad: str, fouten: list) -> list:
             fouten.append(f"Blad '{blad}' rij {i + 1}: ongeldige datum ('{tekst(cel(rij, kd))}'), Vanaf of Tot "
                           f"(datum {DATUM_VOORBEELD}).")
             continue
+        dubbel = [x for x in lijst if norm(x["naam"]) == norm(naam) and x["d"] == d]
+        if dubbel:
+            meldingen.append(("Waarschuwing", f"Blad '{blad}' rij {i + 1}: {naam} staat al eerder op "
+                              f"{datum_tekst(d) if d is not None else 'elke dag'}; telt maar één keer."))
+            continue
         lijst.append({"naam": naam, "d": d, "van": van, "tot": tot})
     return lijst
 
 
 def simu_rotatie(slots: list, simus: list, s: dict, meldingen: list) -> dict:
-    """Simu per slot: in blok b (na b pauzes) krijgt lokaal k van die dag simu (k + b) mod n."""
+    """Simu per slot. In blok b (na b pauzes) krijgt lokaal k van die dag bij voorkeur simu (k + b) mod n, uit
+    iedereen die in dat blok werkt; per slot telt alleen wie dan volgens Vanaf/Tot beschikbaar is."""
     blok = lambda t: sum(1 for p in s["pauzes"] if p[1] <= t)  # noqa: E731
+    kan = lambda x, a, e: (x["van"] is None or x["van"] <= a) and (x["tot"] is None or x["tot"] >= e)  # noqa: E731
     kamers: dict = {}
     bereik: dict = {}
     for slot in slots:
@@ -510,26 +517,37 @@ def simu_rotatie(slots: list, simus: list, s: dict, meldingen: list) -> dict:
         if norm(slot["lokaal"]) not in ks:
             ks.append(norm(slot["lokaal"]))
         bereik[sleutel] = [min(a, slot["t"]), max(e, slot["t"] + s["duur"]), ks]
+    for d in kamers:
+        if not any(x["d"] is None or x["d"] == d for x in simus):
+            andere = sorted({datum_tekst(x["d"]) for x in simus if x["d"] is not None})
+            meldingen.append(("Waarschuwing", f"Geen simucliënten voor {datum_tekst(d)} in het blad Simu" +
+                              (f" (er staan er wel voor {', '.join(andere)})." if andere else ".")))
     gekozen: dict = {}
     for sleutel, (a, e, ks) in bereik.items():
         d, b = (int(x) for x in sleutel.split("_"))
         geschikt = []
         for x in simus:
-            if (x["d"] is None or x["d"] == d) and (x["van"] is None or x["van"] <= a) \
-                    and (x["tot"] is None or x["tot"] >= e) and x["naam"] not in geschikt:
-                geschikt.append(x["naam"])
-        if len(geschikt) < len(ks):
+            werkt = (x["van"] is None or x["van"] < e) and (x["tot"] is None or x["tot"] > a)
+            if (x["d"] is None or x["d"] == d) and werkt and x["naam"] not in [y["naam"] for y in geschikt]:
+                geschikt.append(x)
+        if geschikt and len(geschikt) < len(ks):
             meldingen.append(("Waarschuwing", f"{datum_tekst(d)} {tijd_tekst(a)}-{tijd_tekst(e)}: {len(geschikt)} "
                               f"simucliënt(en) beschikbaar voor {len(ks)} lokalen; niet elk lokaal kan dan draaien."))
         gekozen[sleutel] = geschikt
     uit = {}
+    zonder = 0
     for slot in slots:
         b = blok(slot["t"])
         g = gekozen[f"{slot['d']}_{b}"]
-        if g:
-            k = (kamers[slot["d"]].index(norm(slot["lokaal"])) + (b if s["simu_rotatie"] == "Ja" else 0)) % len(g)
-            uit[f"{slot['d']}_{slot['t']}_{norm(slot['lokaal'])}"] = [
-                {"naam": x, "casus": "", "lokaal": ""} for x in g[k:] + g[:k]]
+        k = (kamers[slot["d"]].index(norm(slot["lokaal"])) + (b if s["simu_rotatie"] == "Ja" else 0)) % len(g) if g else 0
+        lijst = [{"naam": x["naam"], "casus": "", "lokaal": ""} for x in g[k:] + g[:k] if kan(x, slot["t"], slot["t"] + s["duur"])]
+        if lijst:
+            uit[f"{slot['d']}_{slot['t']}_{norm(slot['lokaal'])}"] = lijst
+        else:
+            zonder += 1
+    if zonder and any(gekozen.values()):
+        meldingen.append(("Info", f"{zonder} slot(s) zonder beschikbare simucliënt (bijv. vóór 'Vanaf' of na 'Tot' in "
+                          "het blad Simu); daar wordt niemand ingeroosterd."))
     return uit
 
 
@@ -571,7 +589,7 @@ def maak_rooster(bladen: dict, modus: str) -> dict:
     simu_blad = bladen.get(s["blad_simu"])
     simu_dag = None
     if simu_blad and kolom(simu_blad[0], "tijd") < 0:
-        simu_dag = lees_simu_dag(simu_blad, s["blad_simu"], fouten)
+        simu_dag = lees_simu_dag(simu_blad, s["blad_simu"], fouten, meldingen)
         simus = {}
     else:
         simus = lees_beschikbaar(simu_blad, s["blad_simu"], ("simuclint", "simu", "simulant", "naam"), fouten)
