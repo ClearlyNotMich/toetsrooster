@@ -37,9 +37,9 @@ def gecompileerd(tmp_path_factory):
 
 
 def draai(js: Path, bladen: dict, tmp: Path) -> dict:
-    (tmp / "in.json").write_text(json.dumps(bladen))
+    (tmp / "in.json").write_text(json.dumps(bladen), encoding="utf-8")
     subprocess.run(["node", str(OS / "harness.js"), str(js), str(tmp / "in.json"), str(tmp / "uit.json")], check=True)
-    return json.loads((tmp / "uit.json").read_text())
+    return json.loads((tmp / "uit.json").read_text(encoding="utf-8"))
 
 
 def netjes(matrix):
