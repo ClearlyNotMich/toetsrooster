@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "description": "Alleen voor tests: typecheck van de Office Scripts (Excel Online gebruikt TypeScript 4.0.3)",
+  "devDependencies": { "typescript": "4.0.3" }
+}

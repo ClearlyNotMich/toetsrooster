@@ -1,0 +1,20 @@
+# Allowlist: alleen code en VERZONNEN voorbeeldgegevens. Echte werkmappen (studentgegevens) nooit committen.
+/*
+!/.gitignore
+!/.github/
+!/app/
+!/docs/
+!/officescripts/
+!/oud/
+!/tests/
+!/tools/
+!/voorbeeld/
+!/OWB Exam Roster Generator.txt
+!/OWB Retake Exam Roster Generator.txt
+!/LEESMIJ.md
+!/package.json
+!/package-lock.json
+!/roosterapp.spec
+!/requirements.txt
+__pycache__/
+*.pyc

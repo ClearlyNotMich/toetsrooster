@@ -1,0 +1,421 @@
+/**
+ * EXAM ROSTER SCHEDULING ALGORITHM - Kans 1
+ * Updated for new column layout
+ * For Excel Online (Web)
+ * Date: 2026-04-15
+ */
+
+function main(workbook: ExcelScript.Workbook): void {
+    // Get worksheets
+    const wsStudenten: ExcelScript.Worksheet | undefined = workbook.getWorksheet("Studenten");
+    const wsSlotsKans1: ExcelScript.Worksheet | undefined = workbook.getWorksheet("Slots_Kans1");
+    const wsBeoordelaars: ExcelScript.Worksheet | undefined = workbook.getWorksheet("Beoordelaars");
+    const wsSimu: ExcelScript.Worksheet | undefined = workbook.getWorksheet("Simu");
+    const wsRoosterKans1: ExcelScript.Worksheet | undefined = workbook.getWorksheet("Rooster_Kans1");
+
+    // Check if sheets exist
+    if (!wsStudenten || !wsSlotsKans1 || !wsBeoordelaars || !wsSimu || !wsRoosterKans1) {
+        console.log("ERROR: One or more required sheets are missing!");
+        console.log("Required: Studenten, Slots_Kans1, Beoordelaars, Simu, Rooster_Kans1");
+        return;
+    }
+
+    // Clear output roster (keep headers)
+    clearRoster(wsRoosterKans1);
+
+    // Load data
+    const studenten: Student[] = loadStudenten(wsStudenten);
+    const slots: Slot[] = loadSlots(wsSlotsKans1);
+    const beoordelaars: Map<string, string[]> = loadBeoordelaars(wsBeoordelaars);
+    const simus: Map<string, string[]> = loadSimus(wsSimu);
+
+    console.log(`Loaded: ${studenten.length} students, ${slots.length} slots`);
+
+    // Track which students are assigned
+    const assignedStudents: Set<number> = new Set<number>();
+
+    // Track usage per slot
+    const slotUsage: Map<string, SlotUsage> = new Map<string, SlotUsage>();
+
+    // Collect log messages to print after loop
+    const logMessages: string[] = [];
+
+    let outputRow: number = 2; // Start after header
+
+    // Try to assign each slot
+    for (const slot of slots) {
+        const slotKey: string = `${slot.datum}_${slot.tijd}`;
+
+        if (!slotUsage.has(slotKey)) {
+            slotUsage.set(slotKey, {
+                beoordelaarsUsed: [],
+                simusUsed: [],
+                roomsUsed: []
+            });
+        }
+
+        // Find an unassigned student (not a retake student)
+        let student: Student | null = null;
+        for (const s of studenten) {
+            if (!assignedStudents.has(s.rowIndex) && s.isHerkanser !== "Ja") {
+                student = s;
+                break;
+            }
+        }
+
+        if (!student) {
+            continue; // No more students to assign
+        }
+
+        const currentSlotUsage: SlotUsage | undefined = slotUsage.get(slotKey);
+        if (!currentSlotUsage) {
+            continue;
+        }
+
+        // Find available beoordelaar for this slot (respecting restrictions)
+        const beoordelaarResult: BeoordelaarResult = findAvailableBeoordelaar(
+            beoordelaars,
+            slot.datum,
+            slot.tijd,
+            student,
+            currentSlotUsage
+        );
+
+        if (!beoordelaarResult.beoordelaar) {
+            logMessages.push(`⚠️ No available beoordelaar for ${student.voornaam} ${student.achternaam} at ${slot.tijd}`);
+            continue; // No beoordelaar available
+        }
+
+        // Add restriction messages to log
+        if (beoordelaarResult.restrictionMessages.length > 0) {
+            logMessages.push(...beoordelaarResult.restrictionMessages);
+        }
+
+        // Find available simu for this slot
+        const simu: string | null = findAvailableSimu(
+            simus,
+            slot.datum,
+            slot.tijd,
+            currentSlotUsage
+        );
+
+        if (!simu) {
+            logMessages.push(`⚠️ No available simu for ${student.voornaam} ${student.achternaam} at ${slot.tijd}`);
+            continue; // No simu available
+        }
+
+        // Mark as used
+        currentSlotUsage.beoordelaarsUsed.push(beoordelaarResult.beoordelaar);
+        currentSlotUsage.simusUsed.push(simu);
+        currentSlotUsage.roomsUsed.push(slot.lokaal);
+        assignedStudents.add(student.rowIndex);
+
+        // Write to output roster
+        wsRoosterKans1.getRange(`A${outputRow}`).setValue(slot.datum);
+        wsRoosterKans1.getRange(`B${outputRow}`).setValue(slot.tijd);
+        wsRoosterKans1.getRange(`C${outputRow}`).setValue(slot.lokaal);
+        wsRoosterKans1.getRange(`D${outputRow}`).setValue(slot.casus);
+        wsRoosterKans1.getRange(`E${outputRow}`).setValue(slot.vaardigheid);
+        wsRoosterKans1.getRange(`F${outputRow}`).setValue(beoordelaarResult.beoordelaar);
+        wsRoosterKans1.getRange(`G${outputRow}`).setValue(simu);
+        wsRoosterKans1.getRange(`H${outputRow}`).setValue(student.studentnummer);
+        wsRoosterKans1.getRange(`I${outputRow}`).setValue(student.voornaam);
+        wsRoosterKans1.getRange(`J${outputRow}`).setValue(student.tussenvoegsel);
+        wsRoosterKans1.getRange(`K${outputRow}`).setValue(student.achternaam);
+        wsRoosterKans1.getRange(`L${outputRow}`).setValue(student.klas);
+        wsRoosterKans1.getRange(`M${outputRow}`).setValue(""); // bijzheden
+
+        // Save first attempt info back to student sheet (for retakes)
+        wsStudenten.getRange(`I${student.rowIndex}`).setValue(slot.datum);
+        wsStudenten.getRange(`J${student.rowIndex}`).setValue(slot.tijd);
+        wsStudenten.getRange(`K${student.rowIndex}`).setValue(beoordelaarResult.beoordelaar);
+        wsStudenten.getRange(`L${student.rowIndex}`).setValue(slot.casus);
+
+        outputRow++;
+    }
+
+    console.log(`✅ Assigned ${assignedStudents.size} students to exam slots`);
+
+    // Log unassigned students
+    const unassigned: Student[] = studenten.filter(s => !assignedStudents.has(s.rowIndex) && s.isHerkanser !== "Ja");
+    if (unassigned.length > 0) {
+        console.log(`⚠️ ${unassigned.length} students could not be assigned:`);
+        unassigned.forEach(s => console.log(`   - ${s.voornaam} ${s.achternaam}`));
+    }
+
+    // Print all collected log messages at once
+    if (logMessages.length > 0) {
+        console.log("\n📋 Detailed assignment log:");
+        logMessages.forEach(msg => console.log(msg));
+    }
+}
+
+// ============================================================================
+// DATA TYPES
+// ============================================================================
+
+interface Student {
+    rowIndex: number;
+    studentnummer: string;
+    voornaam: string;
+    tussenvoegsel: string;
+    achternaam: string;
+    klas: string;
+    restrictedSBDocent: string;
+    restrictedVaardighedenDocent: string;
+    isHerkanser: string;
+}
+
+interface Slot {
+    datum: string;
+    tijd: string;
+    lokaal: string;
+    casus: string;
+    vaardigheid: string;
+}
+
+interface SlotUsage {
+    beoordelaarsUsed: string[];
+    simusUsed: string[];
+    roomsUsed: string[];
+}
+
+interface BeoordelaarResult {
+    beoordelaar: string | null;
+    restrictionMessages: string[];
+}
+
+// ============================================================================
+// LOAD FUNCTIONS
+// ============================================================================
+
+function loadStudenten(ws: ExcelScript.Worksheet): Student[] {
+    const range: ExcelScript.Range | undefined = ws.getUsedRange();
+    if (!range) return [];
+
+    const values: (string | number | boolean)[][] = range.getValues();
+    const students: Student[] = [];
+
+    // Start from row 2 (skip header)
+    // NEW LAYOUT: A=Studentnummer, B=Voornaam, C=Tussenvoegsel, D=Achternaam, E=klas,
+    //             F=Niet inroosteren bij SB-docent, G=Niet inroosteren bij de vaardighedendocent, H=IsHerkanser
+    for (let i: number = 1; i < values.length; i++) {
+        const row: (string | number | boolean)[] = values[i];
+        students.push({
+            rowIndex: i + 1, // Excel row number (1-indexed)
+            studentnummer: String(row[0] || ""),
+            voornaam: String(row[1] || ""),
+            tussenvoegsel: String(row[2] || ""),
+            achternaam: String(row[3] || ""),
+            klas: String(row[4] || ""),
+            restrictedSBDocent: String(row[5] || ""),
+            restrictedVaardighedenDocent: String(row[6] || ""),
+            isHerkanser: String(row[7] || "")
+        });
+    }
+
+    return students;
+}
+
+function loadSlots(ws: ExcelScript.Worksheet): Slot[] {
+    const range: ExcelScript.Range | undefined = ws.getUsedRange();
+    if (!range) return [];
+
+    const values: (string | number | boolean)[][] = range.getValues();
+    const slots: Slot[] = [];
+
+    for (let i: number = 1; i < values.length; i++) {
+        const row: (string | number | boolean)[] = values[i];
+        slots.push({
+            datum: formatDate(row[0]),
+            tijd: String(row[1] || ""),
+            lokaal: String(row[2] || ""),
+            casus: String(row[3] || ""),
+            vaardigheid: String(row[4] || "")
+        });
+    }
+
+    return slots;
+}
+
+function loadBeoordelaars(ws: ExcelScript.Worksheet): Map<string, string[]> {
+    const range: ExcelScript.Range | undefined = ws.getUsedRange();
+    if (!range) return new Map();
+
+    const values: (string | number | boolean)[][] = range.getValues();
+    const beoordelaars: Map<string, string[]> = new Map<string, string[]>();
+
+    for (let i: number = 1; i < values.length; i++) {
+        const row: (string | number | boolean)[] = values[i];
+        const datum: string = formatDate(row[0]);
+        const tijd: string = String(row[1] || "");
+        const naam: string = String(row[2] || "");
+
+        const key: string = `${datum}_${tijd}`;
+
+        if (!beoordelaars.has(key)) {
+            beoordelaars.set(key, []);
+        }
+        const existing: string[] | undefined = beoordelaars.get(key);
+        if (existing) {
+            existing.push(naam);
+        }
+    }
+
+    return beoordelaars;
+}
+
+function loadSimus(ws: ExcelScript.Worksheet): Map<string, string[]> {
+    const range: ExcelScript.Range | undefined = ws.getUsedRange();
+    if (!range) return new Map();
+
+    const values: (string | number | boolean)[][] = range.getValues();
+    const simus: Map<string, string[]> = new Map<string, string[]>();
+
+    for (let i: number = 1; i < values.length; i++) {
+        const row: (string | number | boolean)[] = values[i];
+        const datum: string = formatDate(row[0]);
+        const tijd: string = String(row[1] || "");
+        const naam: string = String(row[2] || "");
+
+        const key: string = `${datum}_${tijd}`;
+
+        if (!simus.has(key)) {
+            simus.set(key, []);
+        }
+        const existing: string[] | undefined = simus.get(key);
+        if (existing) {
+            existing.push(naam);
+        }
+    }
+
+    return simus;
+}
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+function findAvailableBeoordelaar(
+    beoordelaars: Map<string, string[]>,
+    datum: string,
+    tijd: string,
+    student: Student,
+    slotUsage: SlotUsage
+): BeoordelaarResult {
+    const key: string = `${datum}_${tijd}`;
+    const available: string[] | undefined = beoordelaars.get(key);
+
+    const restrictionMessages: string[] = [];
+
+    if (!available || available.length === 0) {
+        return { beoordelaar: null, restrictionMessages };
+    }
+
+    // Parse restricted teachers (can be comma or semicolon separated)
+    const restrictedSB: string[] = parseRestrictedTeachers(student.restrictedSBDocent);
+    const restrictedVaardigheden: string[] = parseRestrictedTeachers(student.restrictedVaardighedenDocent);
+    const allRestricted: string[] = [...restrictedSB, ...restrictedVaardigheden];
+
+    // Find one that hasn't been used yet in this slot AND is not restricted
+    for (const beoordelaar of available) {
+        // Check if already used in this slot
+        if (slotUsage.beoordelaarsUsed.includes(beoordelaar)) {
+            continue;
+        }
+
+        // Check if this teacher is restricted for this student
+        if (isTeacherRestricted(beoordelaar, allRestricted)) {
+            restrictionMessages.push(`   ⛔ ${beoordelaar} is restricted for ${student.voornaam} ${student.achternaam}`);
+            continue;
+        }
+
+        // This teacher is available and not restricted
+        return { beoordelaar, restrictionMessages };
+    }
+
+    return { beoordelaar: null, restrictionMessages };
+}
+
+function parseRestrictedTeachers(restrictionString: string): string[] {
+    if (!restrictionString || restrictionString.trim() === "") {
+        return [];
+    }
+
+    // Split by comma or semicolon, trim whitespace, filter empty
+    const separators: RegExp = /[,;]/;
+    return restrictionString
+        .split(separators)
+        .map((name: string) => name.trim())
+        .filter((name: string) => name.length > 0);
+}
+
+function isTeacherRestricted(teacherName: string, restrictedList: string[]): boolean {
+    const normalizedTeacher: string = teacherName.trim().toLowerCase();
+
+    for (const restricted of restrictedList) {
+        const normalizedRestricted: string = restricted.trim().toLowerCase();
+
+        // Exact match or partial match (in case of slight spelling differences)
+        if (normalizedTeacher === normalizedRestricted ||
+            normalizedTeacher.includes(normalizedRestricted) ||
+            normalizedRestricted.includes(normalizedTeacher)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function findAvailableSimu(
+    simus: Map<string, string[]>,
+    datum: string,
+    tijd: string,
+    slotUsage: SlotUsage
+): string | null {
+    const key: string = `${datum}_${tijd}`;
+    const available: string[] | undefined = simus.get(key);
+
+    if (!available || available.length === 0) {
+        return null;
+    }
+
+    // Find one that hasn't been used yet in this slot
+    for (const simu of available) {
+        if (!slotUsage.simusUsed.includes(simu)) {
+            return simu;
+        }
+    }
+
+    return null;
+}
+
+function clearRoster(ws: ExcelScript.Worksheet): void {
+    const usedRange: ExcelScript.Range | undefined = ws.getUsedRange();
+    if (!usedRange) return;
+
+    const lastRow: number = usedRange.getRowCount();
+
+    if (lastRow > 1) {
+        // Clear from row 2 onwards (keep header)
+        const clearRange: ExcelScript.Range = ws.getRange(`A2:M${lastRow}`);
+        clearRange.clear(ExcelScript.ClearApplyTo.contents);
+    }
+}
+
+function formatDate(value: string | number | boolean): string {
+    if (!value) return "";
+
+    // If it's already a string in correct format, return it
+    if (typeof value === "string") {
+        return value;
+    }
+
+    // If it's an Excel serial number (number of days since 1900-01-01)
+    if (typeof value === "number") {
+        const date: Date = new Date((value - 25569) * 86400 * 1000);
+        return date.toISOString().split('T')[0];
+    }
+
+    return String(value);
+}
