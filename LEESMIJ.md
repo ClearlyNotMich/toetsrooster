@@ -23,8 +23,8 @@ De knoppen op het blad *Studenten* verwijzen naar de scripts in je OneDrive. Ver
 
 - **Instellingen** (nieuw blad): dit blad wordt de eerste keer automatisch gemaakt. Je kunt instellen:
   - studiejaar (1/2);
-  - toetsduur (standaard 30 min);
-  - TTV-duur (standaard 45 min), per jaar;
+  - toetsduur (standaard 10 min = één slot);
+  - TTV-duur (standaard 15 min), per jaar;
   - pauze van/tot.
 - **Rooster_Kans1 / Rooster_Her**:
   - het volledige rooster voor docenten, gesorteerd op datum → lokaal → tijd;
@@ -41,7 +41,7 @@ De knoppen op het blad *Studenten* verwijzen naar de scripts in je OneDrive. Ver
   - Het oude script schreef één kolom te vroeg, waardoor er datums in *IsHerkanser* stonden. Maak die cellen leeg en zet `Ja` bij de herkansers.
   - Zolang dat niet is gebeurd, verschijnt er een waarschuwing.
 
-> Let op: vul bij **Toetsduur jaar 2** de echte tijd voor jaar 2 in. Standaard staat er 30/45 min, omdat de juiste waarde niet bekend was.
+> Let op: vul bij **Toetsduur jaar 2** de echte tijd voor jaar 2 in. Standaard staat er 10/15 min, net als in jaar 1, omdat de juiste waarde voor jaar 2 niet bekend was.
 
 ---
 

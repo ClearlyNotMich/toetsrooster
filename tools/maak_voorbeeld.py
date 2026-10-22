@@ -33,7 +33,8 @@ def voorbeeld_bladen() -> dict:
     slot_kop = ["Datum", "Tijd", "Lokaal", "Casus", "Vaardigheid", "Casus na pauze"]
     k1 = [slot_kop]
     for lokaal, casus, na, vaardig in (("A", "XY", "BB", "Gesprek"), ("B", "MM", "NN", "Anamnese")):
-        k1 += [[DAG1, t, lokaal, casus, vaardig, na] for t in tijden("09:00", "12:30")]
+        # Kort ochtendblok, zodat er ook na de pauze (11:00-11:30) studenten zijn.
+        k1 += [[DAG1, t, lokaal, casus, vaardig, na] for t in tijden("10:20", "12:30")]
     her = [slot_kop]
     for lokaal, casus, vaardig in (("A", "XY", "Gesprek"), ("B", "MM", "Anamnese")):
         her += [[DAG2, t, lokaal, casus, vaardig, ""] for t in tijden("09:00", "10:30")]

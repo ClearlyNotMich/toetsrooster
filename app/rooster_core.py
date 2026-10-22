@@ -27,10 +27,10 @@ EERSTE_KOP = ["EersteDatum", "EersteTijd", "EersteBeoordelaar", "EersteCasus"]
 # (label, standaardwaarde, toelichting) — het blad Instellingen gebruikt exact deze labels.
 INSTELLINGEN = [
     ("Jaar", 1, "Studiejaar van deze toets (1 of 2); bepaalt welke toetsduur hieronder geldt."),
-    ("Toetsduur jaar 1 (min)", 30, "Duur van een gewone toets in jaar 1."),
-    ("TTV-toetsduur jaar 1 (min)", 45, "Duur voor studenten met TTV (toegestane tijdverlenging) in jaar 1."),
-    ("Toetsduur jaar 2 (min)", 30, "Duur van een gewone toets in jaar 2 (pas aan: jaar 2 heeft een andere tijd)."),
-    ("TTV-toetsduur jaar 2 (min)", 45, "Duur voor studenten met TTV in jaar 2."),
+    ("Toetsduur jaar 1 (min)", 10, "Duur van een gewone toets in jaar 1 (= één slot van 10 minuten)."),
+    ("TTV-toetsduur jaar 1 (min)", 15, "Duur voor studenten met TTV (toegestane tijdverlenging) in jaar 1."),
+    ("Toetsduur jaar 2 (min)", 10, "Duur van een gewone toets in jaar 2 (pas aan: jaar 2 heeft een andere tijd)."),
+    ("TTV-toetsduur jaar 2 (min)", 15, "Duur voor studenten met TTV in jaar 2."),
     ("Pauze van", "", "Begin van de pauze (bijv. 12:00). Leeg = geen pauze."),
     ("Pauze tot", "", "Einde van de pauze (bijv. 12:30). Leeg = geen pauze."),
 ]

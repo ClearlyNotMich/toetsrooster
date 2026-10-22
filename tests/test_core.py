@@ -35,13 +35,15 @@ def test_toetsduur_en_ttv_aan_einde_blok_voor_pauze():
     for x in rijen(r, "Rooster_Kans1"):
         duur = round((x["Eindtijd"] - x["Tijd"]) * 1440)
         if x["bijzheden"].startswith("TTV"):
-            assert duur == 45 and rc.tijd_tekst(round(x["Tijd"] * 1440)) == "10:40"  # loopt door tot 11:25, pauze 11:00-11:30
+            assert duur == 15 and rc.tijd_tekst(round(x["Tijd"] * 1440)) == "10:50"  # laatste slot vóór de pauze (11:00-11:30)
         else:
-            assert duur == 30 and (x["Eindtijd"] * 1440 <= 660 + 1e-6 or x["Tijd"] * 1440 >= 690 - 1e-6)
+            assert duur == 10 and (x["Eindtijd"] * 1440 <= 660 + 1e-6 or x["Tijd"] * 1440 >= 690 - 1e-6)
 
 
 def test_casus_wisselt_na_pauze():
     r, _ = plan()
+    tijden = [x["Tijd"] * 1440 for x in rijen(r, "Rooster_Kans1")]
+    assert min(tijden) < 660 and max(tijden) >= 690  # er zijn studenten vóór én na de pauze
     for x in rijen(r, "Rooster_Kans1"):
         na = x["Tijd"] * 1440 >= 690 - 1e-6
         assert x["Casus"] == {"A": ("XY", "BB"), "B": ("MM", "NN")}[x["Lokaal"]][na]
@@ -68,7 +70,9 @@ def test_uitdraai_alleen_naam_lokaal_tijd():
     cellen = {str(c) for rij in data for c in rij}
     assert not cellen & {"XY", "MM", "BB", "NN", "Ann", "Bram", "Cor", "Sanne", "Tom", "Uma", "Gesprek"}
     assert not any("9000" in c for c in cellen)
-    assert ["Ilse van der Berg", "A", "16-04-2026 11:30"] in data
+    verwacht = {(" ".join(x for x in (r["Voornaam"], r["vv"], r["Achternaam"]) if x), r["Lokaal"],
+                 f"{rc.datum_tekst(r['Datum'])} {rc.tijd_tekst(round(r['Tijd'] * 1440))}") for r in rijen(r, "Rooster_Kans1")}
+    assert {tuple(x) for x in data} == verwacht
 
 
 def test_eerste_kans_schrijft_juiste_kolommen():

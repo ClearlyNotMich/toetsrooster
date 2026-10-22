@@ -8,14 +8,14 @@ De Office Scripts en de desktop-app gebruiken exact dezelfde regels.
 |---|---|
 | Casus vóór de pauze, een andere erna | Blad **Instellingen**: `Pauze van` / `Pauze tot`. In de slotbladen staat een optionele kolom **Casus na pauze**: slots na de pauze krijgen die casus. Slots ín de pauze worden overgeslagen. Wordt in een lokaal dezelfde casus vóór én na de pauze gebruikt, dan verschijnt er een waarschuwing. |
 | Uitdraai voor studenten zonder studentnummer, casus etc. | Nieuwe bladen **Uitdraai_Kans1** / **Uitdraai_Her** met alleen *Naam*, *Lokaal* en *Tijd* (datum + begintijd), gesorteerd op achternaam. |
-| TTV | Kolom **TTV** = `Ja` → de student krijgt de TTV-toetsduur en komt bij voorkeur in het **laatste slot vóór de pauze**, zodat de extra tijd in de pauze valt (zoals de notitie "einde van het blok voor pauze extra tijd"). Zonder pauze: laatste slot van de dag. Bijzonderheden toont `TTV (45 min)`. |
-| Jaar 2 tijd anders | Instellingen **Jaar** (1 of 2) kiest welke toetsduur geldt; per jaar staan een gewone en een TTV-duur. *Standaard staan beide jaren op 30/45: vul de juiste tijd voor jaar 2 in.* |
-| 30 voor 45 min toets | *Beste inschatting:* gewone toets 30 min, TTV-toets 45 min (instelbaar). |
+| TTV | Kolom **TTV** = `Ja` → de student krijgt de TTV-toetsduur en komt bij voorkeur in het **laatste slot vóór de pauze**, zodat de extra tijd in de pauze valt (zoals de notitie "einde van het blok voor pauze extra tijd"). Zonder pauze: laatste slot van de dag. Bijzonderheden toont `TTV (15 min)`. |
+| Jaar 2 tijd anders | Instellingen **Jaar** (1 of 2) kiest welke toetsduur geldt; per jaar staan een gewone en een TTV-duur. *Standaard staan beide jaren op 10/15 min: vul de juiste tijd voor jaar 2 in.* |
+| 30 voor 45 min toets | Niet eenduidig. De slots, beoordelaars en simucliënten in de werkmap staan per **10 minuten**, en het oude script gaf iedere rij één student. Daarom is besloten: **gewone toets 10 min (één slot), TTV 15 min** (instelbaar). Een eerdere inschatting van 30/45 min paste maar 8 van de 12 studenten in de echte werkmap. Bedoel je echt 30/45 min, vul dat dan in bij Instellingen. |
 | Lokaal + casus | Het volledige rooster is gesorteerd op datum → lokaal → tijd, zodat per lokaal de casus in één blok staat; kolommen Lokaal en Casus staan erin. |
 
 ## Planningsregels
 
-1. Elke rij in `Slots_Kans1` / `Slots_Her` is een mogelijke **begintijd** in een lokaal. Slots mogen in stappen van 10 minuten staan: een toets van 30 minuten blokkeert het lokaal, de beoordelaar en de simucliënt tot de eindtijd, zodat overlappende slots vanzelf vervallen.
+1. Elke rij in `Slots_Kans1` / `Slots_Her` is een mogelijke **begintijd** in een lokaal. Slots mogen in stappen van 10 minuten staan: een toets die langer is dan één slot (bijv. TTV 15 min) blokkeert het lokaal, de beoordelaar en de simucliënt tot de eindtijd, zodat overlappende slots vanzelf vervallen.
 2. Een gewone toets moet vóór `Pauze van` klaar zijn. Een TTV-toets mag doorlopen tot `Pauze tot`.
 3. Beoordelaar en simucliënt moeten op de **begintijd** in hun blad staan en mogen op dat moment geen andere student hebben. Staat er bij hen een *Casus* (of bij de simucliënt een *Lokaal*), dan worden ze alleen daarvoor ingezet.
 4. Beoordelaars die in *Niet inroosteren bij SB-docent* of *Niet inroosteren bij de vaardighedendocent* staan, worden voor die student overgeslagen. Meerdere namen scheid je met `,` of `;`. Een deel van de naam is genoeg, net als in het oude script.
