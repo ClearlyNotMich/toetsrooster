@@ -287,8 +287,9 @@ class InstellingenFormulier(QWidget):
 class SimuImport(QDialog):
     """Kies een datumkolom uit het beschikbaarheidsoverzicht en vink de simucliënten aan voor de toetsdag."""
 
-    def __init__(self, kolommen: list, datum: int, parent=None):
+    def __init__(self, kolommen: list, datum: int, parent=None, nodig: int | None = None):
         super().__init__(parent)
+        self.nodig = nodig  # uit het conceptblad ('7 x'); anders de rij 'nodig' van het overzicht
         self.setWindowTitle("Simucliënten importeren")
         self.setMinimumSize(520, 560)
         self.kolommen = kolommen
@@ -319,6 +320,7 @@ class SimuImport(QDialog):
         knoppen = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         knoppen.button(QDialogButtonBox.Ok).setText("In blad Simu zetten")
         knoppen.button(QDialogButtonBox.Ok).setObjectName("primair")
+        self.ok = knoppen.button(QDialogButtonBox.Ok)
         knoppen.button(QDialogButtonBox.Cancel).setText("Annuleren")
         knoppen.accepted.connect(self.accept)
         knoppen.rejected.connect(self.reject)
@@ -328,20 +330,29 @@ class SimuImport(QDialog):
         # Voorkeuze: de kolom met dezelfde datum als de toetsdag.
         import uitvoer
         passend = [i for i, k in enumerate(kolommen) if uitvoer.datum_bij(k["dag_maand"], datum) == datum]
+        self.gevonden = bool(passend)  # geen kolom voor de toetsdag: niets voorvinken, zelf kiezen
+        self.waarschuwing = label(f"Geen kolom voor {rc.datum_tekst(datum)} in dit overzicht. Kies zelf de juiste kolom; "
+                                  "er is nog niemand aangevinkt.", "uitleg", wrap=True)
+        self.waarschuwing.setStyleSheet(f"color: {KLEUR['let_op']};")
+        self.waarschuwing.setVisible(not passend)
+        lay.insertWidget(lay.indexOf(self.lijst), self.waarschuwing)
         self.kolom.setCurrentIndex(passend[0] if passend else 0)
         self._vul()
 
     def _vul(self, *_):
+        if self.sender() is self.kolom:
+            self.gevonden = True  # zelf een kolom gekozen: dan wel voorvinken
+            self.waarschuwing.setVisible(False)
         k = self.kolommen[self.kolom.currentIndex()]
         self.lijst.blockSignals(True)
         self.lijst.clear()
-        nodig = k["nodig"] if k["nodig"] is not None else len(k["simus"])
+        nodig = self.nodig or (k["nodig"] if k["nodig"] is not None else len(k["simus"]))
         aan = 0
         for s in k["simus"]:
             extra = "" if rc.norm(s["tekst"]) == "x" else f"  ·  {s['tekst']}"
             item = QListWidgetItem(s["naam"] + extra)
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-            vink = s["zeker"] and aan < nodig
+            vink = self.gevonden and s["zeker"] and aan < nodig
             aan += vink
             item.setCheckState(Qt.Checked if vink else Qt.Unchecked)
             item.setData(Qt.UserRole, s)
@@ -352,7 +363,8 @@ class SimuImport(QDialog):
     def _tel(self, *_):
         k = self.kolommen[self.kolom.currentIndex()]
         n = len(self.gekozen())
-        nodig = f"nodig: {k['nodig']}" if k["nodig"] is not None else "aantal nodig onbekend"
+        nodig = f"nodig: {self.nodig} (concept)" if self.nodig else f"nodig: {k['nodig']}" if k["nodig"] is not None else "aantal nodig onbekend"
+        self.ok.setEnabled(n > 0)
         self.telling.setText(f"{n} gekozen · {nodig}" + (f" · tijden in overzicht: {k['tijd']}" if k["tijd"] else ""))
 
     def gekozen(self) -> list:

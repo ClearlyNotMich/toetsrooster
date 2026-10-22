@@ -208,3 +208,78 @@ def test_datum_als_tekst_in_toetsdag_en_simu():
         b["Toetsdag_Kans1"][1][0] = "14 april"
     r = plan(wijzig=zonder_jaar)
     assert len(r["fouten"]) == 1 and "'14 april'" in r["fouten"][0] and "14 april 2026" in r["fouten"][0]
+
+
+# ---------------------------------------------------------------- conceptblad (lijstvorm)
+
+def concept(wijzig=None, modus="kans1"):
+    b = mv.concept_bladen()
+    if wijzig:
+        wijzig(b)
+    return rc.maak_rooster(b, modus)
+
+
+def test_concept_zoals_roostermaker_het_opschrijft():
+    r = concept()
+    assert r["fouten"] == []
+    alle = rijen(r)
+    studenten = [x for x in alle if x["bijzheden"] != rc.VRIJ]
+    assert len(studenten) == 61 and not any(x["bijzheden"] == rc.NIET for x in alle)
+    assert {tijd(x["Tijd"]) for x in alle} == {"10:00", "10:20", "10:40", "11:00", "11:45", "12:05", "12:25", "12:45",
+                                               "14:00", "14:20", "14:40", "15:00", "15:45", "16:05", "16:25", "16:45"}
+    per_lokaal = {x["Lokaal"]: (x["Casus"], x["Beoordelaar"]) for x in alle if x["Tijd"] * 1440 < 700}
+    assert per_lokaal["A1"] == ("K1 man", "Ann") and per_lokaal["C2"] == ("K7 vrouw", "Fien")
+    assert {x["Beoordelaar"] for x in alle if x["Lokaal"] == "C2" and x["Tijd"] * 1440 >= 810} == {"Hans"}
+    assert not [x for x in alle if x["Lokaal"] == "C2" and x["Beoordelaar"] == "Fien" and x["Eindtijd"] * 1440 > 780]
+    assert "Zeger" not in {x["simucliënt"] for x in alle}  # 7 nodig, de 8e is reserve
+    tekst = " ".join(m[1] for m in r["meldingen"])
+    for stuk in ("staat dubbel", "Niet ingedeeld (reserve): Ida (reactie nog afwachten)", "reserve: Zeger",
+                 "C2 Fien (tot 13:00) → Hans (vanaf 13:30)", "7 lokalen, 16 tijden (10:00-17:00), toets 15 min, 3 pauze(s)"):
+        assert stuk in tekst, stuk
+
+
+def test_concept_gaat_voor_toetsdag_met_waarschuwing():
+    def ook_toetsdag(b):
+        b["Toetsdag_Kans1"] = mv.dag_bladen()["Toetsdag_Kans1"]
+    r = concept(ook_toetsdag)
+    assert any("wordt niet gebruikt: het conceptblad 'Concept' gaat voor" in m[1] for m in r["meldingen"])
+    assert {x["Lokaal"] for x in rijen(r)} == {"A1", "A2", "B1", "B2", "C1", "Praktijkhuis", "C2"}
+
+
+def test_concept_reserve_inzetten_en_studenten_uit_concept():
+    def krap(b):
+        rijen_ = b["Concept"]
+        start = [i for i, r in enumerate(rijen_) if r[0] == "inzet"][0]
+        del rijen_[start + 1:start + 3]  # Bram en Cor weg -> te weinig beoordelaars
+        del b["Studenten"]
+        i = [k for k, r in enumerate(rijen_) if r[0] == "studenten"][0]
+        rijen_[i][1] = "Lieve van der Bloemhof"
+        rijen_.insert(i + 1, ["", "Pim Vos"])
+    r = concept(krap)
+    tekst = " ".join(m[1] for m in r["meldingen"])
+    assert "Reserve Ida ingezet" in tekst and "Reserve Jet ingezet" in tekst
+    assert "Studenten uit blad 'Concept' (2)" in tekst
+    stud = {(x["Voornaam"], x["vv"], x["Achternaam"]) for x in rijen(r) if x["Voornaam"]}
+    assert stud == {("Lieve", "van der", "Bloemhof"), ("Pim", "", "Vos")}
+    assert r["bladen"]["Studenten"][0][:4] == ["Studentnummer", "Voornaam", "Tussenvoegsel", "Achternaam"]
+
+
+def test_concept_fouten():
+    def kapot(b):
+        b["Concept"][1][1] = "15 december"  # geen jaartal
+        i = [k for k, r in enumerate(b["Concept"]) if r[0] == "tijden"][0]
+        b["Concept"][i][1] = "tien uur"
+    r = concept(kapot)
+    assert len(r["fouten"]) == 2 and any("datum" in f for f in r["fouten"]) and any("tien uur" in f for f in r["fouten"])
+
+
+def test_simus_wisselen_na_elke_toets():
+    def per_toets(b):
+        b["Instellingen"] = rc.instellingen_matrix({"simu_rotatie": "Na elke toets"})
+    alle = rijen(concept(per_toets))
+    a1 = [x["simucliënt"] for x in sorted(alle, key=lambda x: x["Tijd"]) if x["Lokaal"] == "A1"]
+    assert a1[:8] == ["Siem", "Tom", "Uma", "Vera", "Wout", "Xan", "Yara", "Siem"]
+    for t in {x["Tijd"] for x in alle}:  # nooit twee lokalen tegelijk met dezelfde simu
+        simus = [x["simucliënt"] for x in alle if x["Tijd"] == t]
+        assert len(simus) == len(set(simus))
+    assert rc.lees_instellingen(rc.instellingen_matrix({"simu_rotatie": "Ja"}), [])["simu_rotatie"] == "Na elke pauze"

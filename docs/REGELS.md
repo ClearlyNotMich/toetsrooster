@@ -21,6 +21,37 @@ Uit de instellingen (eerste toets, laatste toets, toetsduur, wisseltijd en pauze
 
 > **Standaard toetsduur gewijzigd:** van 10/15 naar **15 min, TTV 20 min**. De eerdere keuze kwam uit de oude testwerkmap, met slots per 10 minuten. Het echte rooster (M1.6 kans 1) gebruikt 15 minuten toets plus 5 minuten wissel. Pas het per toets aan bij Instellingen. De TTV-duur van 20 minuten is een aanname; controleer die.
 
+**Of: conceptblad (lijstvorm).** Zo schrijf je het ook op papier op. In kolom A staan kopjes, in kolom B de waarden eronder (één per rij):
+
+| A | B |
+|---|---|
+| datum | 15-12-2026 |
+| inzet | Ann de Boer |
+| | … (één naam per rij) |
+| | Fien ochtend tot 13.00 |
+| | Hans middag vanaf 13.30 uur |
+| | Ida Klaproos (reactie nog afwachten) |
+| tijden | 10.00 - 10.15 |
+| | 10.20 - 10.35 … |
+| pauzes | 11.15-11.40 … |
+| lokalen | A1 … |
+| casussen | K1 man … (in dezelfde volgorde als de lokalen) |
+| simu's | 7 x |
+| studenten | (optioneel: één naam per rij, als er geen blad Studenten is) |
+
+Zo wordt het gelezen:
+
+- **Lokalen en casussen** worden op volgorde gekoppeld. Optioneel zijn er ook *vaardigheden* en *casussen na pauze*.
+- **Inzet:**
+  - Een gewone naam krijgt een lokaal voor de hele dag, in de volgorde van de lijst.
+  - *ochtend/tot …* en *middag/vanaf …* vormen samen één lokaal, waarbij de tweede het na die tijd overneemt.
+  - Een naam met een opmerking tussen haakjes is reserve. Een reserve wordt alleen ingezet als er anders te weinig beoordelaars zijn.
+- **Tijden:** precies de tijden uit de lijst worden gebruikt. Dubbele tijden tellen één keer, met een melding. De toetsduur komt uit de tijden (10.00 - 10.15 = 15 min).
+- **Tijden en pauzes** uit het concept gaan voor de instellingen.
+- **"simu's: 7 x":** de eerste 7 simu's voor die datum uit het blad Simu worden gebruikt; de rest is reserve.
+
+Staat er een conceptblad in de werkmap, dan gaat het voor het blad Toetsdag. Dat staat dan ook als melding bij Meldingen. In de app zet **Concept laden…** het concept uit een ander bestand in de open werkmap. Bij *Excel opslaan* wordt het bewaard als blad *Concept*.
+
 **Oude werkwijze:** is het blad Toetsdag leeg en bestaat *Slots_Kans1* / *Slots_Her* (één rij per begintijd), dan worden de oude bladen gebruikt, samen met *Beoordelaars*. Een *Simu*-blad met een kolom *Tijd* wordt ook nog gelezen als één rij per slot.
 
 ## Uitvoer
@@ -64,7 +95,7 @@ Alle instellingen staan in het blad **Instellingen** en in de app op de pagina *
 | TTV | TTV-plaatsing | Eind van blok vóór pauze | Waar TTV-studenten bij voorkeur komen. Aan het eind van een blok valt de extra tijd in de pauze. Keuzes: Eind van blok vóór pauze / Zo vroeg mogelijk. |
 | TTV | TTV-studenten eerst inroosteren | Ja | Geeft TTV-studenten als eerste een plek, zodat de beste plekken voor hen vrij zijn. Keuzes: Ja / Nee. |
 | Voorkeur | Middag begint om | 12:00 | Grens tussen voorkeur ochtend en middag. |
-| Simucliënten | Simu's rouleren per blok | Ja | Na elke pauze schuift elke simucliënt een lokaal door. Nee: iedere simu blijft in hetzelfde lokaal. Keuzes: Ja / Nee. |
+| Simucliënten | Simu's wisselen van lokaal | Na elke pauze | Na elke pauze of na elke toets schuift elke simucliënt een lokaal door, zodat niemand de hele dag bij dezelfde toets zit. Nee: iedere simu blijft in hetzelfde lokaal. Keuzes: Na elke pauze / Na elke toets / Nee. |
 | Beoordelaars | Namen deels vergelijken | Ja | ‘Ann’ sluit dan ook ‘Anneke’ uit. Vangt spelfouten op, maar kan te veel uitsluiten. Keuzes: Ja / Nee. |
 | Herkansing | Andere beoordelaar dan 1e kans | Voorkeur | Verplicht: lukt het niet, dan wordt de student niet ingeroosterd. Keuzes: Voorkeur / Verplicht / Maakt niet uit. |
 | Herkansing | Andere casus dan 1e kans | Voorkeur | Verplicht: lukt het niet, dan wordt de student niet ingeroosterd. Keuzes: Voorkeur / Verplicht / Maakt niet uit. |
@@ -89,7 +120,15 @@ Alle instellingen staan in het blad **Instellingen** en in de app op de pagina *
 
 1. **Slots.** Per rij in het blad Toetsdag komt er een slot op elke begintijd. Een gewone toets raakt nooit een pauze en loopt nooit na *Laatste toets klaar om*.
 2. **Beoordelaar.** Per lokaal staat de beoordelaar uit het blad Toetsdag. Na *Wissel om* is dat *Beoordelaar 2*.
-3. **Simucliënten** komen uit het blad Simu, voor die datum en binnen *Vanaf*/*Tot*. Per blok (het deel tussen twee pauzes) krijgt lokaal *k* simucliënt *(k + blok) mod n*, zodat ze na elke pauze een lokaal doorschuiven. Zijn er minder geschikte simu's dan lokalen, dan volgt een waarschuwing en draait niet elk lokaal.
+3. **Simucliënten** komen uit het blad Simu, voor die datum. Per slot wordt alleen gebruikt wie dan volgens *Vanaf*/*Tot* beschikbaar is.
+   - Met *Simu's wisselen van lokaal* = **Na elke pauze** krijgt lokaal *k* simu *(k + aantal pauzes) mod n*.
+   - Met **Na elke toets** krijgt lokaal *k* simu *(k + hoeveelste tijd van de dag) mod n*, zodat elke simu na iedere toets een lokaal doorschuift en niet de hele dag bij dezelfde toets zit.
+   - Met **Nee** blijft iedere simu in hetzelfde lokaal.
+
+   Er volgt een waarschuwing:
+   - bij minder simu's dan lokalen;
+   - bij een dubbele naam;
+   - bij een dag zonder simu's.
 4. **Uitsluitingen.** Beoordelaars in *Niet inroosteren bij …* worden voor die student overgeslagen. Namen scheid je met `,` `;` of `/` (bijvoorbeeld `Sofie/Youri`). Met *Namen deels vergelijken* telt een deel van de naam ook.
 5. **Volgorde:**
    - eerst TTV-studenten;

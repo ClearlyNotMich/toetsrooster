@@ -145,7 +145,36 @@ def dag_simu_invoerfouten():
     return b
 
 
+def concept_met(**waarden):
+    def maak():
+        b = mv.concept_bladen()
+        b["Instellingen"] = rc.instellingen_matrix(waarden)
+        return b
+    return maak
+
+
+def concept_studenten_en_fout():
+    b = mv.concept_bladen()
+    del b["Studenten"]
+    i = [k for k, r in enumerate(b["Concept"]) if r[0] == "studenten"][0]
+    b["Concept"][i][1] = "Lieve van der Bloemhof"
+    b["Concept"].insert(i + 1, ["", "Pim Vos"])
+    b["Toetsdag_Her"] = mv.dag_bladen()["Toetsdag_Her"]
+    return b
+
+
+def concept_kapot():
+    b = mv.concept_bladen()
+    b["Concept"][1][1] = "15 december"
+    return b
+
+
 SCENARIOS = {
+    "concept": mv.concept_bladen,
+    "concept_na_elke_toets": concept_met(simu_rotatie="Na elke toets", casus_na="Na elke pauze afwisselen"),
+    "concept_oude_waarde_ja": concept_met(simu_rotatie="Ja"),
+    "concept_studenten_en_fout": concept_studenten_en_fout,
+    "concept_kapot": concept_kapot,
     "dag_simu_invoerfouten": dag_simu_invoerfouten,
     "dag_datumtekst": dag_datumtekst,
     "dag": mv.dag_bladen,

@@ -34,6 +34,9 @@ NIET = "NIET INGEROOSTERD"
 JA_NEE = ["Ja", "Nee"]
 VOORKEUR = ["Voorkeur", "Verplicht", "Maakt niet uit"]
 VOORKEUREN = ["Ochtend", "Middag", "Vroeg", "Laat"]
+SIMU_WISSEL = ["Na elke pauze", "Na elke toets", "Nee"]
+# Oude waarden in het blad Instellingen die nog geldig zijn.
+ALIASSEN = {"simu_rotatie": {"ja": "Na elke pauze"}}
 CASUS_NA = ["Nee", "Na pauze 1", "Na pauze 2", "Na pauze 3", "Na elke pauze afwisselen"]
 GROEPEN = {
     "Toetsdag": "Uit deze tijden en het blad Toetsdag maakt het programma alle slots: om de toetsduur plus de "
@@ -76,8 +79,9 @@ INSTELLINGEN = [
     _inst("ttv_eerst", "TTV", "TTV-studenten eerst inroosteren", "keuze", "Ja",
           "Geeft TTV-studenten als eerste een plek, zodat de beste plekken voor hen vrij zijn.", JA_NEE),
     _inst("middag", "Voorkeur", "Middag begint om", "tijd", "12:00", "Grens tussen voorkeur ochtend en middag."),
-    _inst("simu_rotatie", "Simucliënten", "Simu's rouleren per blok", "keuze", "Ja",
-          "Na elke pauze schuift elke simucliënt een lokaal door. Nee: iedere simu blijft in hetzelfde lokaal.", JA_NEE),
+    _inst("simu_rotatie", "Simucliënten", "Simu's wisselen van lokaal", "keuze", "Na elke pauze",
+          "Na elke pauze of na elke toets schuift elke simucliënt een lokaal door, zodat niemand de hele dag bij "
+          "dezelfde toets zit. Nee: iedere simu blijft in hetzelfde lokaal.", SIMU_WISSEL),
     _inst("deelnaam", "Beoordelaars", "Namen deels vergelijken", "keuze", "Ja",
           "‘Ann’ sluit dan ook ‘Anneke’ uit. Vangt spelfouten op, maar kan te veel uitsluiten.", JA_NEE),
     _inst("her_beo", "Herkansing", "Andere beoordelaar dan 1e kans", "keuze", "Voorkeur",
@@ -298,7 +302,8 @@ def lees_instellingen(matrix: list | None, fouten: list) -> dict:
                               "(van vóór tot, niet overlappend) of leeg.")
                 s[k] = []
         elif i["soort"] == "keuze":
-            gevonden = [o for o in i["opties"] if norm(o) == norm(v)]
+            gevonden = [o for o in i["opties"] if norm(o) == norm(v)] or \
+                [a for k_, a in ALIASSEN.get(k, {}).items() if k_ == norm(v)]
             s[k] = gevonden[0] if gevonden else i["standaard"]
             if not gevonden:
                 fouten.append(f"Instellingen: '{label}' moet een van deze waarden zijn: {' / '.join(i['opties'])}.")
@@ -502,8 +507,9 @@ def lees_simu_dag(matrix: list, blad: str, fouten: list, meldingen: list) -> lis
 
 
 def simu_rotatie(slots: list, simus: list, s: dict, meldingen: list) -> dict:
-    """Simu per slot. In blok b (na b pauzes) krijgt lokaal k van die dag bij voorkeur simu (k + b) mod n, uit
-    iedereen die in dat blok werkt; per slot telt alleen wie dan volgens Vanaf/Tot beschikbaar is."""
+    """Simu per slot. Lokaal k van die dag krijgt bij voorkeur simu (k + stap) mod n, uit iedereen die in dat blok
+    werkt; stap = aantal pauzes ervoor ('Na elke pauze') of het hoeveelste tijdstip van de dag ('Na elke toets').
+    Per slot telt alleen wie dan volgens Vanaf/Tot beschikbaar is."""
     blok = lambda t: sum(1 for p in s["pauzes"] if p[1] <= t)  # noqa: E731
     kan = lambda x, a, e: (x["van"] is None or x["van"] <= a) and (x["tot"] is None or x["tot"] >= e)  # noqa: E731
     kamers: dict = {}
@@ -517,6 +523,9 @@ def simu_rotatie(slots: list, simus: list, s: dict, meldingen: list) -> dict:
         if norm(slot["lokaal"]) not in ks:
             ks.append(norm(slot["lokaal"]))
         bereik[sleutel] = [min(a, slot["t"]), max(e, slot["t"] + s["duur"]), ks]
+    tijden = {d: sorted({x["t"] for x in slots if x["d"] == d}) for d in kamers}
+    stap = lambda d, t: (blok(t) if s["simu_rotatie"] == "Na elke pauze"  # noqa: E731
+                         else tijden[d].index(t) if s["simu_rotatie"] == "Na elke toets" else 0)
     for d in kamers:
         if not any(x["d"] is None or x["d"] == d for x in simus):
             andere = sorted({datum_tekst(x["d"]) for x in simus if x["d"] is not None})
@@ -539,7 +548,7 @@ def simu_rotatie(slots: list, simus: list, s: dict, meldingen: list) -> dict:
     for slot in slots:
         b = blok(slot["t"])
         g = gekozen[f"{slot['d']}_{b}"]
-        k = (kamers[slot["d"]].index(norm(slot["lokaal"])) + (b if s["simu_rotatie"] == "Ja" else 0)) % len(g) if g else 0
+        k = (kamers[slot["d"]].index(norm(slot["lokaal"])) + stap(slot["d"], slot["t"])) % len(g) if g else 0
         lijst = [{"naam": x["naam"], "casus": "", "lokaal": ""} for x in g[k:] + g[:k] if kan(x, slot["t"], slot["t"] + s["duur"])]
         if lijst:
             uit[f"{slot['d']}_{slot['t']}_{norm(slot['lokaal'])}"] = lijst
@@ -548,6 +557,150 @@ def simu_rotatie(slots: list, simus: list, s: dict, meldingen: list) -> dict:
     if zonder and any(gekozen.values()):
         meldingen.append(("Info", f"{zonder} slot(s) zonder beschikbare simucliënt (bijv. vóór 'Vanaf' of na 'Tot' in "
                           "het blad Simu); daar wordt niemand ingeroosterd."))
+    return uit
+
+
+# ---------------------------------------------------------------- conceptblad (lijstvorm)
+# Eén blad met in kolom A een kopje (datum, inzet, tijden, pauzes, lokalen, casussen, simu's, studenten) en in
+# kolom B de waarden eronder, zoals de roostermaker het opschrijft. Wordt gebruikt als het blad Toetsdag leeg is.
+
+SECTIES = [("casussennapauze", "casus_na"), ("casusnapauze", "casus_na"), ("casus", "casus"), ("vaardig", "vaardigheid"),
+           ("datum", "datum"), ("inzet", "inzet"), ("beoordelaar", "inzet"), ("tijd", "tijden"), ("pauze", "pauzes"),
+           ("lokal", "lokalen"), ("simu", "simus"), ("student", "studenten")]
+
+
+def sectie(label: str) -> str:
+    n = norm(label)
+    return next((naam for begin, naam in SECTIES if n.startswith(begin)), "")
+
+
+def vind_concept(bladen: dict) -> str:
+    """Naam van het eerste blad in conceptvorm (kopjes 'lokalen' en 'tijden' of 'inzet' in kolom A), anders ''."""
+    for naam, rijen in bladen.items():
+        kopjes = {sectie(cel(r, 0)) for r in rijen or [] if tekst(cel(r, 0))}
+        if "lokalen" in kopjes and ("tijden" in kopjes or "inzet" in kopjes):
+            return naam
+    return ""
+
+
+def lees_inzet(t: str, middag: int) -> dict:
+    """'Fien ochtend tot 13.00' -> naam Fien, tot 13:00; 'Jet (nog niet eerder gedaan)' -> opmerking."""
+    laag = t.lower()
+    tijd = r"(\d{1,2}(?:[.:]\d{2})?)"
+    uur = lambda x: naar_minuten(x if re.search(r"[.:]", x) else x + ":00")  # noqa: E731
+    tot = re.search(r"\btot\s+" + tijd, laag)
+    van = re.search(r"\b(?:vanaf|va)\s+" + tijd, laag)
+    opm = re.search(r"\(([^)]*)\)", t)
+    naam = re.split(r"\s*(?:\(|,|\b(?:ochtend|middag|tot|vanaf|va)\b)", t, maxsplit=1, flags=re.IGNORECASE)[0].strip()
+    return {"naam": naam or t.strip(), "tekst": t.strip(), "opm": opm[1].strip() if opm else "",
+            "tot": uur(tot[1]) if tot else (middag if heeft_woord(laag, "ochtend") else None),
+            "van": uur(van[1]) if van else (middag if heeft_woord(laag, "middag") else None)}
+
+
+def wie_tekst(p: dict) -> str:
+    return p["naam"] + (f" (tot {tijd_tekst(p['tot'])})" if p["tot"] is not None else "") + \
+        (f" (vanaf {tijd_tekst(p['van'])})" if p["van"] is not None else "")
+
+
+def lees_concept(matrix: list, blad: str, s: dict, fouten: list, meldingen: list) -> dict:
+    """Conceptblad -> slots, beoordelaars per slot, aantal simu's nodig, eventueel studenten.
+    Tijden, pauzes en toetsduur uit het blad gaan voor de instellingen (s wordt aangepast)."""
+    waarden: dict = {}
+    huidig = ""
+    for rij in matrix:
+        if tekst(cel(rij, 0)):
+            huidig = sectie(cel(rij, 0))
+        if huidig and tekst(cel(rij, 1)):
+            waarden.setdefault(huidig, []).append(cel(rij, 1))
+    uit = {"slots": [], "beo": {}, "nodig": 0, "studenten": None, "d": None}
+    datums = waarden.get("datum", [])
+    d = naar_datum(datums[0]) if datums else None
+    if d is None:
+        fouten.append(f"Blad '{blad}': vul bij 'datum' een geldige datum in ({DATUM_VOORBEELD}; nu "
+                      f"'{tekst(datums[0]) if datums else ''}').")
+    uit["d"] = d
+    # tijden: '10.00 - 10.15' (begin en eind) of alleen een begintijd
+    starts, duren = [], []
+    for v in waarden.get("tijden", []):
+        delen = [naar_minuten(x) for x in re.split(r"\s*[-–]\s*", tekst(v))] if not isinstance(v, (int, float)) else [naar_minuten(v)]
+        if not delen or None in delen or len(delen) > 2 or (len(delen) == 2 and delen[1] <= delen[0]):
+            fouten.append(f"Blad '{blad}': tijd '{tekst(v)}' is ongeldig (gebruik bijv. 10.00 - 10.15).")
+            continue
+        if delen[0] in starts:
+            meldingen.append(("Waarschuwing", f"Blad '{blad}': tijd '{tekst(v)}' staat dubbel; telt één keer."))
+            continue
+        starts.append(delen[0])
+        if len(delen) == 2:
+            duren.append(delen[1] - delen[0])
+    if duren:
+        if len(set(duren)) > 1:
+            meldingen.append(("Waarschuwing", f"Blad '{blad}': niet alle tijden zijn even lang; de toetsduur is {duren[0]} min."))
+        s["duur"] = duren[0]
+    if waarden.get("pauzes"):
+        pz = lees_pauzes(", ".join(tekst(v) for v in waarden["pauzes"]))
+        if pz is None:
+            fouten.append(f"Blad '{blad}': pauzes moeten zoiets zijn als '11.15-11.40' (van vóór tot, niet overlappend).")
+        else:
+            s["pauzes"] = pz
+    starts = sorted(starts) or tijdgrid(s)
+    if starts:
+        s["start"], s["eind"] = starts[0], max(starts) + s["duur"]
+    lokalen = [tekst(v) for v in waarden.get("lokalen", [])]
+    lijst = lambda naam: [tekst(v) for v in waarden.get(naam, [])]  # noqa: E731
+    casus, casus_na, vaardigheid = lijst("casus"), lijst("casus_na"), lijst("vaardigheid")
+    if len(casus) != len(lokalen):
+        meldingen.append(("Waarschuwing", f"Blad '{blad}': {len(lokalen)} lokalen maar {len(casus)} casussen; "
+                          "ze worden op volgorde gekoppeld."))
+    # beoordelaars: hele dag op volgorde, dan ochtend+middag als koppel, opmerking tussen haakjes = reserve
+    inzet = [lees_inzet(tekst(v), s["middag"]) for v in waarden.get("inzet", [])]
+    heel = [p for p in inzet if p["tot"] is None and p["van"] is None and not p["opm"]]
+    ochtend = [p for p in inzet if p["tot"] is not None and p["van"] is None]
+    middag = [p for p in inzet if p["van"] is not None and p["tot"] is None]
+    koppels = [[a, b] for a, b in zip(ochtend, middag)]
+    gebruikt = [p for k in koppels for p in k]
+    reserve = [p for p in inzet if p not in heel and p not in gebruikt]
+    per_lokaal = [[p] for p in heel] + koppels
+    while len(per_lokaal) < len(lokalen) and reserve:
+        p = reserve.pop(0)
+        meldingen.append(("Waarschuwing", f"Reserve {wie_tekst(p)} ingezet omdat er anders te weinig beoordelaars zijn"
+                          + (f" (opmerking: {p['opm']})." if p["opm"] else ".")))
+        per_lokaal.append([p])
+    for p in [q for k in per_lokaal[len(lokalen):] for q in k] + reserve:
+        meldingen.append(("Info", f"Niet ingedeeld (reserve): {p['tekst']}."))
+    indeling = []
+    for k, lokaal in enumerate(lokalen):
+        wie = per_lokaal[k] if k < len(per_lokaal) else []
+        indeling.append(f"{lokaal} {' → '.join(wie_tekst(p) for p in wie) or '(geen beoordelaar)'}")
+        if not wie:
+            meldingen.append(("Waarschuwing", f"Lokaal {lokaal} heeft geen beoordelaar; daar wordt niemand ingeroosterd."))
+        if d is None:
+            continue
+        for t in starts:
+            uit["slots"].append({"n": len(uit["slots"]), "d": d, "t": t, "lokaal": lokaal,
+                                 "casus": casus[k] if k < len(casus) else "",
+                                 "casus_na": casus_na[k] if k < len(casus_na) else "",
+                                 "vaardigheid": vaardigheid[k] if k < len(vaardigheid) else ""})
+            past_ = [p for p in wie if (p["van"] is None or p["van"] <= t) and (p["tot"] is None or t + s["duur"] <= p["tot"])]
+            if past_:
+                uit["beo"][f"{d}_{t}_{norm(lokaal)}"] = [{"naam": past_[0]["naam"], "casus": "", "lokaal": ""}]
+    if not lokalen:
+        fouten.append(f"Blad '{blad}': geen lokalen ingevuld.")
+    nodig = re.search(r"\d+", " ".join(tekst(v) for v in waarden.get("simus", [])))
+    uit["nodig"] = int(nodig[0]) if nodig else 0
+    if waarden.get("studenten"):
+        rijen = [["Studentnummer", "Voornaam", "Tussenvoegsel", "Achternaam"]]
+        for v in waarden["studenten"]:
+            w = tekst(v).split()
+            j = 1
+            while j < len(w) - 1 and w[j].islower():
+                j += 1
+            rijen.append(["", w[0], " ".join(w[1:j]), " ".join(w[j:])])
+        uit["studenten"] = rijen
+    if not fouten:
+        meldingen.append(("Info", f"Toetsdag uit blad '{blad}' ({datum_tekst(d)}): {len(lokalen)} lokalen, {len(starts)} "
+                          f"tijden ({tijd_tekst(s['start'])}-{tijd_tekst(s['eind'])}), toets {s['duur']} min, "
+                          f"{len(s['pauzes'])} pauze(s). Tijden en pauzes uit dit blad gaan voor de instellingen."))
+        meldingen.append(("Info", "Indeling: " + " · ".join(indeling) + "."))
     return uit
 
 
@@ -575,10 +728,21 @@ def maak_rooster(bladen: dict, modus: str) -> dict:
     aangevuld = instellingen_aangevuld(bladen.get(INSTELLINGEN_BLAD))
     if aangevuld:
         uit[INSTELLINGEN_BLAD] = aangevuld
-    studenten, studenten_kop = lees_studenten(bladen.get(s["blad_studenten"]), s["blad_studenten"], fouten, meldingen)
     dag = bladen.get(s[m["dag"]])
-    dagmodus = heeft_data(dag) or not bladen.get(s[m["slots"]])
-    if dagmodus and not dag:
+    concept = vind_concept(bladen)
+    if concept and heeft_data(dag):
+        meldingen.append(("Waarschuwing", f"Blad '{s[m['dag']]}' wordt niet gebruikt: het conceptblad '{concept}' gaat voor."))
+    c = lees_concept(bladen[concept], concept, s, fouten, meldingen) if concept else {"studenten": None, "nodig": 0}
+    studenten_blad = bladen.get(s["blad_studenten"])
+    if not heeft_data(studenten_blad) and c["studenten"]:
+        studenten_blad = c["studenten"]
+        meldingen.append(("Info", f"Studenten uit blad '{concept}' ({len(studenten_blad) - 1}); "
+                          f"geen blad '{s['blad_studenten']}' met studenten gevonden."))
+    studenten, studenten_kop = lees_studenten(studenten_blad, s["blad_studenten"], fouten, meldingen)
+    dagmodus = heeft_data(dag) or bool(concept) or not bladen.get(s[m["slots"]])
+    if concept:
+        slots, beoordelaars = c["slots"], c["beo"]
+    elif dagmodus and not dag:
         fouten.append(f"Blad '{s[m['dag']]}' ontbreekt of is leeg.")
         slots, beoordelaars = [], {}
     elif dagmodus:
@@ -603,7 +767,7 @@ def maak_rooster(bladen: dict, modus: str) -> dict:
     pauzenr = lambda t: sum(1 for p in pz if p[1] <= t)  # noqa: E731
     regel = s["casus_na"]
     wissel = lambda nr: regel != "Nee" and (nr % 2 == 1 if regel == "Na elke pauze afwisselen" else nr >= int(regel[-1]))  # noqa: E731
-    if dagmodus:
+    if dagmodus and not concept:
         meldingen.append(("Info", f"Slots gemaakt uit blad '{s[m['dag']]}': {len(slots)} slots "
                           f"({tijd_tekst(s['start'])}-{tijd_tekst(s['eind'])}, elke {s['duur'] + s['wissel']} min)."))
     bruikbaar = []
@@ -622,6 +786,12 @@ def maak_rooster(bladen: dict, modus: str) -> dict:
         bruikbaar.append(slot)
     if in_pauze:
         meldingen.append(("Info", f"{in_pauze} slot(s) vallen in een pauze en zijn overgeslagen."))
+    if simu_dag is not None and c["nodig"]:
+        # 'simu's: 7 x' in het conceptblad: alleen de eerste 7 voor die dag, de rest is reserve.
+        die_dag = [x for x in simu_dag if x["d"] is None or x["d"] == c["d"]]
+        if len(die_dag) > c["nodig"]:
+            meldingen.append(("Info", f"{c['nodig']} simucliënten nodig; reserve: {', '.join(x['naam'] for x in die_dag[c['nodig']:])}."))
+            simu_dag = [x for x in simu_dag if x not in die_dag[c["nodig"]:]]
     if simu_dag is not None:
         simus = simu_rotatie(bruikbaar, simu_dag, s, meldingen)
 
@@ -770,7 +940,7 @@ def maak_rooster(bladen: dict, modus: str) -> dict:
                 c = len(kop)
                 kop.append(naam)
             cols.append(c)
-        nieuw = [list(r) + [""] * (len(kop) - len(r)) for r in bladen[s["blad_studenten"]]]
+        nieuw = [list(r) + [""] * (len(kop) - len(r)) for r in studenten_blad]
         nieuw[0] = kop
         for st in doel:
             r = toegewezen.get(st["i"])

@@ -37,6 +37,8 @@ De knoppen op het blad *Studenten* verwijzen naar de scripts in je OneDrive. Ver
 
 De tijden van de dag (eerste toets, laatste toets, toetsduur, wisseltijd en pauzes) staan in het blad **Instellingen**. Ze zijn ingesteld zoals op de echte toetsdag: 15 min toets + 5 min wissel, van 09:40 tot 17:00, met pauzes om 11:15, 13:00 en 15:15.
 
+**Of in lijstvorm:** zet één blad in de werkmap met in kolom A de kopjes *datum, inzet, tijden, pauzes, lokalen, casussen, simu's* en in kolom B de waarden eronder, zoals je het op papier zou opschrijven. Dat werkt ook in Excel Online. In de app kan het met **Concept laden…**. Zie [docs/REGELS.md](docs/REGELS.md).
+
 De volledige regels staan in [docs/REGELS.md](docs/REGELS.md). Werkmappen met de oude bladen *Slots_Kans1*, *Slots_Her* en *Beoordelaars* (één rij per begintijd) werken ook nog, zolang het blad Toetsdag leeg is.
 
 ### Wat er verandert in de werkmap
@@ -45,7 +47,7 @@ De volledige regels staan in [docs/REGELS.md](docs/REGELS.md). Werkmappen met de
   - begin en eind van de dag, wisseltijd en studiejaar;
   - toetsduur per jaar: standaard 15 min, TTV 20 min. Dit was eerst 10/15; het is aangepast aan het echte rooster;
   - pauzes en wanneer de casus wisselt;
-  - of simu's per blok rouleren;
+  - of simu's na elke pauze, na elke toets of nooit van lokaal wisselen;
   - vrije plekken tonen;
   - de grens tussen ochtend en middag voor voorkeuren;
   - waar TTV-studenten komen;

@@ -54,6 +54,35 @@ def dag_bladen() -> dict:
             "Instellingen": rc.instellingen_matrix()}
 
 
+def concept_blad(datum=46371) -> list:
+    """Conceptblad in lijstvorm, zoals de roostermaker het opschrijft (verzonnen namen)."""
+    rijen = [["jaar 1 toets", ""], ["datum ", datum]]
+    secties = [
+        ("inzet", ["Ann", "Bram", "Cor", "Dirk", "Eef", "Gijs", "Fien ochtend tot 13.00", "Hans middag vanaf 13.30 uur",
+                   "Ida (reactie nog afwachten)", "Jet (nog niet eerder gedaan)"]),
+        ("tijden", ["10.00 - 10.15", "10.20 - 10.35", "10.40 - 10.55", "10.40 - 10.55", "11.00 - 11.15", "11.45 - 12.00",
+                    "12.05 - 12.20", "12.25 - 12.40", "12.45 - 13.00", "14.00 - 14.15", "14.20 - 14.35", "14.40 - 14.55",
+                    "15.00 - 15.15", "15.45 - 16.00", "16.05 - 16.20", "16.25 - 16.40", "16.45 - 17.00"]),
+        ("pauzes", ["11.15-11.40", "13.00-13.55", "15.15-15.40"]),
+        ("lokalen", ["A1", "A2", "B1", "B2", "C1", "Praktijkhuis", "C2"]),
+        ("casussen", ["K1 man", "K2 man", "K3 vrouw", "K4 vrouw", "K5 vrouw", "K6 vrouw", "K7 vrouw"]),
+        ("simu's", ["7 x"]),
+        ("studenten", []),
+    ]
+    for kop, waarden in secties:
+        rijen.append([kop, waarden[0] if waarden else ""])
+        rijen += [["", w] for w in waarden[1:]]
+    return rijen
+
+
+def concept_bladen() -> dict:
+    """Werkmap met conceptblad + studenten + simu's voor die dag (8 beschikbaar, 7 nodig)."""
+    b = dag_bladen()
+    simu = [["Datum", "simucliënt", "Vanaf", "Tot"]] + [[46371, n, "10:00", "17:00"]
+                                                       for n in ("Siem", "Tom", "Uma", "Vera", "Wout", "Xan", "Yara", "Zeger")]
+    return {"Concept": concept_blad(), "Studenten": b["Studenten"], "Simu": simu, "Instellingen": rc.instellingen_matrix()}
+
+
 def voorbeeld_bladen() -> dict:
     kop = ["Studentnummer", "Voornaam", "Tussenvoegsel", "Achternaam", "klas", "Niet inroosteren bij SB-docent",
            "Niet inroosteren bij de vaardighedendocent", "TTV", "IsHerkanser", "EersteDatum", "EersteTijd",

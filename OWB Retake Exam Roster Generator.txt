@@ -30,6 +30,8 @@ interface Student {
 interface SimuDag { naam: string; d: number | null; van: number | null; tot: number | null; }
 interface Bereik { d: number; b: number; a: number; e: number; ks: string[]; }
 interface Inst { w: Map<string, Cel>; pauzes: number[][]; }
+interface Inzet { naam: string; tekst: string; opm: string; tot: number | null; van: number | null; }
+interface Concept { slots: Slot[]; beo: Map<string, Persoon[]>; nodig: number; studenten: Matrix | null; d: number | null; }
 interface Slot { n: number; d: number; t: number; lokaal: string; casus: string; casusNa: string; vaardigheid: string; }
 interface Persoon { naam: string; casus: string; lokaal: string; }
 interface Toewijzing { st: Student | null; slot: Slot; eind: number; beo: string; simu: string; }
@@ -50,6 +52,8 @@ const EERSTE_KOP: string[] = ["EersteDatum", "EersteTijd", "EersteBeoordelaar", 
 const VRIJ: string = "Vrije plek";
 const NIET: string = "NIET INGEROOSTERD";
 const VOORKEUREN: string[] = ["Ochtend", "Middag", "Vroeg", "Laat"];
+// Oude waarden in het blad Instellingen die nog geldig zijn.
+const ALIASSEN: Map<string, string> = new Map<string, string>([["simu_rotatie|ja", "Na elke pauze"]]);
 // Gegenereerd uit app/rooster_core.py (INSTELLINGEN): één bron voor app, blad Instellingen en scripts.
 const INSTELLINGEN: Instelling[] = [
     {"sleutel": "start", "groep": "Toetsdag", "label": "Eerste toets om", "soort": "tijd", "standaard": "09:40", "uitleg": "Begintijd van de eerste student.", "opties": [], "min": 0, "max": 0},
@@ -65,7 +69,7 @@ const INSTELLINGEN: Instelling[] = [
     {"sleutel": "ttv_plek", "groep": "TTV", "label": "TTV-plaatsing", "soort": "keuze", "standaard": "Eind van blok vóór pauze", "uitleg": "Waar TTV-studenten bij voorkeur komen. Aan het eind van een blok valt de extra tijd in de pauze.", "opties": ["Eind van blok vóór pauze", "Zo vroeg mogelijk"], "min": 0, "max": 0},
     {"sleutel": "ttv_eerst", "groep": "TTV", "label": "TTV-studenten eerst inroosteren", "soort": "keuze", "standaard": "Ja", "uitleg": "Geeft TTV-studenten als eerste een plek, zodat de beste plekken voor hen vrij zijn.", "opties": ["Ja", "Nee"], "min": 0, "max": 0},
     {"sleutel": "middag", "groep": "Voorkeur", "label": "Middag begint om", "soort": "tijd", "standaard": "12:00", "uitleg": "Grens tussen voorkeur ochtend en middag.", "opties": [], "min": 0, "max": 0},
-    {"sleutel": "simu_rotatie", "groep": "Simucliënten", "label": "Simu's rouleren per blok", "soort": "keuze", "standaard": "Ja", "uitleg": "Na elke pauze schuift elke simucliënt een lokaal door. Nee: iedere simu blijft in hetzelfde lokaal.", "opties": ["Ja", "Nee"], "min": 0, "max": 0},
+    {"sleutel": "simu_rotatie", "groep": "Simucliënten", "label": "Simu's wisselen van lokaal", "soort": "keuze", "standaard": "Na elke pauze", "uitleg": "Na elke pauze of na elke toets schuift elke simucliënt een lokaal door, zodat niemand de hele dag bij dezelfde toets zit. Nee: iedere simu blijft in hetzelfde lokaal.", "opties": ["Na elke pauze", "Na elke toets", "Nee"], "min": 0, "max": 0},
     {"sleutel": "deelnaam", "groep": "Beoordelaars", "label": "Namen deels vergelijken", "soort": "keuze", "standaard": "Ja", "uitleg": "‘Ann’ sluit dan ook ‘Anneke’ uit. Vangt spelfouten op, maar kan te veel uitsluiten.", "opties": ["Ja", "Nee"], "min": 0, "max": 0},
     {"sleutel": "her_beo", "groep": "Herkansing", "label": "Andere beoordelaar dan 1e kans", "soort": "keuze", "standaard": "Voorkeur", "uitleg": "Verplicht: lukt het niet, dan wordt de student niet ingeroosterd.", "opties": ["Voorkeur", "Verplicht", "Maakt niet uit"], "min": 0, "max": 0},
     {"sleutel": "her_casus", "groep": "Herkansing", "label": "Andere casus dan 1e kans", "soort": "keuze", "standaard": "Voorkeur", "uitleg": "Verplicht: lukt het niet, dan wordt de student niet ingeroosterd.", "opties": ["Voorkeur", "Verplicht", "Maakt niet uit"], "min": 0, "max": 0},
@@ -433,7 +437,10 @@ function leesInstellingen(matrix: Matrix | undefined, fouten: string[]): Inst {
             pauzes = pz || [];
             s.set(i.sleutel, "");
         } else if (i.soort === "keuze") {
-            const gevonden: string[] = i.opties.filter((o: string) => norm(o) === norm(v));
+            let gevonden: string[] = i.opties.filter((o: string) => norm(o) === norm(v));
+            if (gevonden.length === 0 && ALIASSEN.has(`${i.sleutel}|${norm(v)}`)) {
+                gevonden = [ALIASSEN.get(`${i.sleutel}|${norm(v)}`) as string];
+            }
             s.set(i.sleutel, gevonden.length > 0 ? gevonden[0] : i.standaard);
             if (gevonden.length === 0) {
                 fouten.push(`Instellingen: '${i.label}' moet een van deze waarden zijn: ${i.opties.join(" / ")}.`);
@@ -703,9 +710,10 @@ function leesSimuDag(matrix: Matrix, blad: string, fouten: string[], meldingen: 
     return lijst;
 }
 
-// Simu per slot. In blok b (na b pauzes) krijgt lokaal k van die dag bij voorkeur simu (k + b) mod n, uit
-// iedereen die in dat blok werkt; per slot telt alleen wie dan volgens Vanaf/Tot beschikbaar is.
-function simuRotatie(slots: Slot[], simus: SimuDag[], pz: number[][], duur: number, rotatie: boolean, meldingen: Cel[][]): Map<string, Persoon[]> {
+// Simu per slot. Lokaal k van die dag krijgt bij voorkeur simu (k + stap) mod n, uit iedereen die in dat blok
+// werkt; stap = aantal pauzes ervoor ('Na elke pauze') of het hoeveelste tijdstip van de dag ('Na elke toets').
+// Per slot telt alleen wie dan volgens Vanaf/Tot beschikbaar is.
+function simuRotatie(slots: Slot[], simus: SimuDag[], pz: number[][], duur: number, rotatie: string, meldingen: Cel[][]): Map<string, Persoon[]> {
     const blok = (t: number): number => pz.filter((p: number[]) => p[1] <= t).length;
     const kan = (x: SimuDag, a: number, e: number): boolean => (x.van === null || x.van <= a) && (x.tot === null || x.tot >= e);
     const kamers: Map<number, string[]> = new Map<number, string[]>();
@@ -729,6 +737,19 @@ function simuRotatie(slots: Slot[], simus: SimuDag[], pz: number[][], duur: numb
         x.a = Math.min(x.a, slot.t);
         x.e = Math.max(x.e, slot.t + duur);
     }
+    const tijden: Map<number, number[]> = new Map<number, number[]>();
+    for (const slot of slots) {
+        if (!tijden.has(slot.d)) {
+            tijden.set(slot.d, []);
+        }
+        const lijst: number[] = tijden.get(slot.d) as number[];
+        if (lijst.indexOf(slot.t) < 0) {
+            lijst.push(slot.t);
+        }
+    }
+    tijden.forEach((lijst: number[]) => { lijst.sort((a: number, b: number) => a - b); });
+    const stap = (d: number, t: number): number => rotatie === "Na elke pauze" ? blok(t)
+        : rotatie === "Na elke toets" ? (tijden.get(d) as number[]).indexOf(t) : 0;
     kamers.forEach((_: string[], d: number) => {
         if (!simus.some((x: SimuDag) => x.d === null || x.d === d)) {
             const andere: string[] = [];
@@ -762,7 +783,7 @@ function simuRotatie(slots: Slot[], simus: SimuDag[], pz: number[][], duur: numb
         const b: number = blok(slot.t);
         const g: SimuDag[] = gekozen.get(`${slot.d}_${b}`) as SimuDag[];
         const k: number = g.length > 0
-            ? ((kamers.get(slot.d) as string[]).indexOf(norm(slot.lokaal)) + (rotatie ? b : 0)) % g.length : 0;
+            ? ((kamers.get(slot.d) as string[]).indexOf(norm(slot.lokaal)) + stap(slot.d, slot.t)) % g.length : 0;
         const lijst: Persoon[] = g.slice(k).concat(g.slice(0, k)).filter((x: SimuDag) => kan(x, slot.t, slot.t + duur))
             .map((x: SimuDag) => ({ naam: x.naam, casus: "", lokaal: "" }));
         if (lijst.length > 0) {
@@ -776,6 +797,199 @@ function simuRotatie(slots: Slot[], simus: SimuDag[], pz: number[][], duur: numb
     if (zonder > 0 && ietsGekozen) {
         meldingen.push(["Info", `${zonder} slot(s) zonder beschikbare simucliënt (bijv. vóór 'Vanaf' of na 'Tot' in ` +
             "het blad Simu); daar wordt niemand ingeroosterd."]);
+    }
+    return uit;
+}
+
+// ============================================================ conceptblad (lijstvorm)
+// Eén blad met in kolom A een kopje (datum, inzet, tijden, pauzes, lokalen, casussen, simu's, studenten) en in
+// kolom B de waarden eronder, zoals de roostermaker het opschrijft. Wordt gebruikt als het blad Toetsdag leeg is.
+
+const SECTIES: string[][] = [["casussennapauze", "casus_na"], ["casusnapauze", "casus_na"], ["casus", "casus"],
+    ["vaardig", "vaardigheid"], ["datum", "datum"], ["inzet", "inzet"], ["beoordelaar", "inzet"], ["tijd", "tijden"],
+    ["pauze", "pauzes"], ["lokal", "lokalen"], ["simu", "simus"], ["student", "studenten"]];
+
+function sectie(label: Cel): string {
+    const n: string = norm(label);
+    const gevonden: string[][] = SECTIES.filter((x: string[]) => n.indexOf(x[0]) === 0);
+    return gevonden.length > 0 ? gevonden[0][1] : "";
+}
+
+// Naam van het eerste blad in conceptvorm (kopjes 'lokalen' en 'tijden' of 'inzet' in kolom A), anders ''.
+function vindConcept(bladen: Map<string, Matrix>): string {
+    let uit: string = "";
+    bladen.forEach((rijen: Matrix, naam: string) => {
+        const kopjes: string[] = (rijen || []).filter((r: Cel[]) => tekst(cel(r, 0)) !== "").map((r: Cel[]) => sectie(cel(r, 0)));
+        if (!uit && kopjes.indexOf("lokalen") >= 0 && (kopjes.indexOf("tijden") >= 0 || kopjes.indexOf("inzet") >= 0)) {
+            uit = naam;
+        }
+    });
+    return uit;
+}
+
+function uurNaarMinuten(x: string): number | null {
+    return naarMinuten(/[.:]/.test(x) ? x : x + ":00");
+}
+
+// 'Fien ochtend tot 13.00' -> naam Fien, tot 13:00; 'Jet (nog niet eerder gedaan)' -> opmerking.
+function leesInzet(t: string, middag: number): Inzet {
+    const laag: string = t.toLowerCase();
+    const tot: RegExpMatchArray | null = laag.match(/\btot\s+(\d{1,2}(?:[.:]\d{2})?)/);
+    const van: RegExpMatchArray | null = laag.match(/\b(?:vanaf|va)\s+(\d{1,2}(?:[.:]\d{2})?)/);
+    const opm: RegExpMatchArray | null = t.match(/\(([^)]*)\)/);
+    const naam: string = t.split(/\s*(?:\(|,|\b(?:ochtend|middag|tot|vanaf|va)\b)/i)[0].trim();
+    return {
+        naam: naam || t.trim(), tekst: t.trim(), opm: opm ? opm[1].trim() : "",
+        tot: tot ? uurNaarMinuten(tot[1]) : (heeftWoord(laag, "ochtend") ? middag : null),
+        van: van ? uurNaarMinuten(van[1]) : (heeftWoord(laag, "middag") ? middag : null),
+    };
+}
+
+function wieTekst(p: Inzet): string {
+    return p.naam + (p.tot !== null ? ` (tot ${tijdTekst(p.tot)})` : "") + (p.van !== null ? ` (vanaf ${tijdTekst(p.van)})` : "");
+}
+
+// Conceptblad -> slots, beoordelaars per slot, aantal simu's nodig, eventueel studenten.
+// Tijden, pauzes en toetsduur uit het blad gaan voor de instellingen (inst wordt aangepast).
+function leesConcept(matrix: Matrix, blad: string, inst: Inst, fouten: string[], meldingen: Cel[][]): Concept {
+    const s: Map<string, Cel> = inst.w;
+    const waarden: Map<string, Cel[]> = new Map<string, Cel[]>();
+    let huidig: string = "";
+    for (const rij of matrix) {
+        if (tekst(cel(rij, 0))) {
+            huidig = sectie(cel(rij, 0));
+        }
+        if (huidig && tekst(cel(rij, 1))) {
+            if (!waarden.has(huidig)) {
+                waarden.set(huidig, []);
+            }
+            (waarden.get(huidig) as Cel[]).push(cel(rij, 1));
+        }
+    }
+    const lijst = (naam: string): Cel[] => waarden.get(naam) || [];
+    const uit: Concept = { slots: [], beo: new Map<string, Persoon[]>(), nodig: 0, studenten: null, d: null };
+    const datums: Cel[] = lijst("datum");
+    const d: number | null = datums.length > 0 ? naarDatum(datums[0]) : null;
+    if (d === null) {
+        fouten.push(`Blad '${blad}': vul bij 'datum' een geldige datum in (${DATUM_VOORBEELD}; nu ` +
+            `'${datums.length > 0 ? tekst(datums[0]) : ""}').`);
+    }
+    uit.d = d;
+    const starts: number[] = [];
+    const duren: number[] = [];
+    for (const v of lijst("tijden")) {
+        const delen: (number | null)[] = typeof v === "number" ? [naarMinuten(v)]
+            : tekst(v).split(/\s*[-–]\s*/).map((x: string) => naarMinuten(x));
+        if (delen.length === 0 || delen.indexOf(null) >= 0 || delen.length > 2 ||
+            (delen.length === 2 && (delen[1] as number) <= (delen[0] as number))) {
+            fouten.push(`Blad '${blad}': tijd '${tekst(v)}' is ongeldig (gebruik bijv. 10.00 - 10.15).`);
+            continue;
+        }
+        if (starts.indexOf(delen[0] as number) >= 0) {
+            meldingen.push(["Waarschuwing", `Blad '${blad}': tijd '${tekst(v)}' staat dubbel; telt één keer.`]);
+            continue;
+        }
+        starts.push(delen[0] as number);
+        if (delen.length === 2) {
+            duren.push((delen[1] as number) - (delen[0] as number));
+        }
+    }
+    if (duren.length > 0) {
+        if (duren.some((x: number) => x !== duren[0])) {
+            meldingen.push(["Waarschuwing", `Blad '${blad}': niet alle tijden zijn even lang; de toetsduur is ${duren[0]} min.`]);
+        }
+        s.set("duur", duren[0]);
+    }
+    if (lijst("pauzes").length > 0) {
+        const pz: number[][] | null = leesPauzes(lijst("pauzes").map((v: Cel) => tekst(v)).join(", "));
+        if (pz === null) {
+            fouten.push(`Blad '${blad}': pauzes moeten zoiets zijn als '11.15-11.40' (van vóór tot, niet overlappend).`);
+        } else {
+            inst.pauzes = pz;
+        }
+    }
+    const duur: number = s.get("duur") as number;
+    let tijden: number[] = starts.slice().sort((a: number, b: number) => a - b);
+    if (tijden.length === 0) {
+        tijden = tijdgrid(s.get("start") as number, s.get("eind") as number, duur, s.get("wissel") as number, inst.pauzes);
+    }
+    if (tijden.length > 0) {
+        s.set("start", tijden[0]);
+        s.set("eind", Math.max(...tijden) + duur);
+    }
+    const lokalen: string[] = lijst("lokalen").map((v: Cel) => tekst(v));
+    const casus: string[] = lijst("casus").map((v: Cel) => tekst(v));
+    const casusNa: string[] = lijst("casus_na").map((v: Cel) => tekst(v));
+    const vaardigheid: string[] = lijst("vaardigheid").map((v: Cel) => tekst(v));
+    if (casus.length !== lokalen.length) {
+        meldingen.push(["Waarschuwing", `Blad '${blad}': ${lokalen.length} lokalen maar ${casus.length} casussen; ` +
+            "ze worden op volgorde gekoppeld."]);
+    }
+    // beoordelaars: hele dag op volgorde, dan ochtend+middag als koppel, opmerking tussen haakjes = reserve
+    const inzet: Inzet[] = lijst("inzet").map((v: Cel) => leesInzet(tekst(v), s.get("middag") as number));
+    const heel: Inzet[] = inzet.filter((p: Inzet) => p.tot === null && p.van === null && !p.opm);
+    const ochtend: Inzet[] = inzet.filter((p: Inzet) => p.tot !== null && p.van === null);
+    const middag: Inzet[] = inzet.filter((p: Inzet) => p.van !== null && p.tot === null);
+    const koppels: Inzet[][] = [];
+    for (let k: number = 0; k < Math.min(ochtend.length, middag.length); k++) {
+        koppels.push([ochtend[k], middag[k]]);
+    }
+    const gebruikt: Inzet[] = [];
+    koppels.forEach((k: Inzet[]) => { gebruikt.push(k[0], k[1]); });
+    const reserve: Inzet[] = inzet.filter((p: Inzet) => heel.indexOf(p) < 0 && gebruikt.indexOf(p) < 0);
+    const perLokaal: Inzet[][] = heel.map((p: Inzet) => [p]).concat(koppels);
+    while (perLokaal.length < lokalen.length && reserve.length > 0) {
+        const p: Inzet = reserve.shift() as Inzet;
+        meldingen.push(["Waarschuwing", `Reserve ${wieTekst(p)} ingezet omdat er anders te weinig beoordelaars zijn` +
+            (p.opm ? ` (opmerking: ${p.opm}).` : ".")]);
+        perLokaal.push([p]);
+    }
+    const overig: Inzet[] = [];
+    perLokaal.slice(lokalen.length).forEach((k: Inzet[]) => { k.forEach((q: Inzet) => overig.push(q)); });
+    overig.concat(reserve).forEach((p: Inzet) => meldingen.push(["Info", `Niet ingedeeld (reserve): ${p.tekst}.`]));
+    const indeling: string[] = [];
+    lokalen.forEach((lokaal: string, k: number) => {
+        const wie: Inzet[] = k < perLokaal.length ? perLokaal[k] : [];
+        indeling.push(`${lokaal} ${wie.map((p: Inzet) => wieTekst(p)).join(" → ") || "(geen beoordelaar)"}`);
+        if (wie.length === 0) {
+            meldingen.push(["Waarschuwing", `Lokaal ${lokaal} heeft geen beoordelaar; daar wordt niemand ingeroosterd.`]);
+        }
+        if (d === null) {
+            return;
+        }
+        for (const t of tijden) {
+            uit.slots.push({
+                n: uit.slots.length, d: d, t: t, lokaal: lokaal, casus: k < casus.length ? casus[k] : "",
+                casusNa: k < casusNa.length ? casusNa[k] : "", vaardigheid: k < vaardigheid.length ? vaardigheid[k] : "",
+            });
+            const past: Inzet[] = wie.filter((p: Inzet) => (p.van === null || p.van <= t) && (p.tot === null || t + duur <= p.tot));
+            if (past.length > 0) {
+                uit.beo.set(`${d}_${t}_${norm(lokaal)}`, [{ naam: past[0].naam, casus: "", lokaal: "" }]);
+            }
+        }
+    });
+    if (lokalen.length === 0) {
+        fouten.push(`Blad '${blad}': geen lokalen ingevuld.`);
+    }
+    const nodig: RegExpMatchArray | null = lijst("simus").map((v: Cel) => tekst(v)).join(" ").match(/\d+/);
+    uit.nodig = nodig ? Number(nodig[0]) : 0;
+    if (lijst("studenten").length > 0) {
+        const rijen: Matrix = [["Studentnummer", "Voornaam", "Tussenvoegsel", "Achternaam"]];
+        for (const v of lijst("studenten")) {
+            const w: string[] = tekst(v).split(/\s+/);
+            let j: number = 1;
+            while (j < w.length - 1 && w[j] === w[j].toLowerCase() && w[j] !== w[j].toUpperCase()) {
+                j++;
+            }
+            rijen.push(["", w[0], w.slice(1, j).join(" "), w.slice(j).join(" ")]);
+        }
+        uit.studenten = rijen;
+    }
+    if (fouten.length === 0) {
+        meldingen.push(["Info", `Toetsdag uit blad '${blad}' (${datumTekst(d as number)}): ${lokalen.length} lokalen, ` +
+            `${tijden.length} tijden (${tijdTekst(s.get("start") as number)}-${tijdTekst(s.get("eind") as number)}), ` +
+            `toets ${duur} min, ${inst.pauzes.length} pauze(s). Tijden en pauzes uit dit blad gaan voor de instellingen.`]);
+        meldingen.push(["Info", "Indeling: " + indeling.join(" · ") + "."]);
     }
     return uit;
 }
@@ -797,7 +1011,7 @@ function maakRooster(bladen: Map<string, Matrix>, modus: string): Resultaat {
     const meldingen: Cel[][] = [];
     const inst: Inst = leesInstellingen(bladen.get(INSTELLINGEN_BLAD), fouten);
     const s: Map<string, Cel> = inst.w;
-    const pz: number[][] = inst.pauzes;
+    let pz: number[][] = inst.pauzes;
     const txt = (k: string): string => s.get(k) as string;
     const num = (k: string): number => s.get(k) as number;
     const roosterBlad: string = txt(m.rooster);
@@ -807,13 +1021,29 @@ function maakRooster(bladen: Map<string, Matrix>, modus: string): Resultaat {
     if (aangevuld) {
         uit.set(INSTELLINGEN_BLAD, aangevuld);
     }
-    const studenten: Student[] = leesStudenten(bladen.get(txt("blad_studenten")), txt("blad_studenten"), fouten, meldingen);
     const dag: Matrix | undefined = bladen.get(txt(m.dag));
+    const concept: string = vindConcept(bladen);
+    if (concept && heeftData(dag)) {
+        meldingen.push(["Waarschuwing", `Blad '${txt(m.dag)}' wordt niet gebruikt: het conceptblad '${concept}' gaat voor.`]);
+    }
+    const c: Concept = concept ? leesConcept(bladen.get(concept) as Matrix, concept, inst, fouten, meldingen)
+        : { slots: [], beo: new Map<string, Persoon[]>(), nodig: 0, studenten: null, d: null };
+    pz = inst.pauzes;
+    let studentenBlad: Matrix | undefined = bladen.get(txt("blad_studenten"));
+    if (!heeftData(studentenBlad) && c.studenten) {
+        studentenBlad = c.studenten;
+        meldingen.push(["Info", `Studenten uit blad '${concept}' (${studentenBlad.length - 1}); ` +
+            `geen blad '${txt("blad_studenten")}' met studenten gevonden.`]);
+    }
+    const studenten: Student[] = leesStudenten(studentenBlad, txt("blad_studenten"), fouten, meldingen);
     const oudeSlots: Matrix | undefined = bladen.get(txt(m.slots));
-    const dagmodus: boolean = heeftData(dag) || !oudeSlots || oudeSlots.length === 0;
+    const dagmodus: boolean = heeftData(dag) || concept !== "" || !oudeSlots || oudeSlots.length === 0;
     let slots: Slot[] = [];
     let beoordelaars: Map<string, Persoon[]> = new Map<string, Persoon[]>();
-    if (dagmodus && (!dag || dag.length === 0)) {
+    if (concept) {
+        slots = c.slots;
+        beoordelaars = c.beo;
+    } else if (dagmodus && (!dag || dag.length === 0)) {
         fouten.push(`Blad '${txt(m.dag)}' ontbreekt of is leeg.`);
     } else if (dagmodus) {
         const tijden: number[] = tijdgrid(num("start"), num("eind"), num("duur"), num("wissel"), pz);
@@ -845,7 +1075,7 @@ function maakRooster(bladen: Map<string, Matrix>, modus: string): Resultaat {
     const regel: string = txt("casus_na");
     const wissel = (nr: number): boolean => regel !== "Nee" &&
         (regel === "Na elke pauze afwisselen" ? nr % 2 === 1 : nr >= Number(regel.charAt(regel.length - 1)));
-    if (dagmodus) {
+    if (dagmodus && !concept) {
         meldingen.push(["Info", `Slots gemaakt uit blad '${txt(m.dag)}': ${slots.length} slots ` +
             `(${tijdTekst(num("start"))}-${tijdTekst(num("eind"))}, elke ${duurNormaal + num("wissel")} min).`]);
     }
@@ -870,8 +1100,17 @@ function maakRooster(bladen: Map<string, Matrix>, modus: string): Resultaat {
     if (inPauze > 0) {
         meldingen.push(["Info", `${inPauze} slot(s) vallen in een pauze en zijn overgeslagen.`]);
     }
+    if (simuDag !== null && c.nodig > 0) {
+        // 'simu's: 7 x' in het conceptblad: alleen de eerste 7 voor die dag, de rest is reserve.
+        const dieDag: SimuDag[] = simuDag.filter((x: SimuDag) => x.d === null || x.d === c.d);
+        if (dieDag.length > c.nodig) {
+            const extra: SimuDag[] = dieDag.slice(c.nodig);
+            meldingen.push(["Info", `${c.nodig} simucliënten nodig; reserve: ${extra.map((x: SimuDag) => x.naam).join(", ")}.`]);
+            simuDag = simuDag.filter((x: SimuDag) => extra.indexOf(x) < 0);
+        }
+    }
     if (simuDag !== null) {
-        simus = simuRotatie(bruikbaar, simuDag, pz, duurNormaal, txt("simu_rotatie") === "Ja", meldingen);
+        simus = simuRotatie(bruikbaar, simuDag, pz, duurNormaal, txt("simu_rotatie"), meldingen);
     }
 
     const doel: Student[] = studenten.filter((st: Student) => st.her === (modus === "her"));
@@ -1061,7 +1300,7 @@ function maakRooster(bladen: Map<string, Matrix>, modus: string): Resultaat {
     uit.set(roosterBlad, rooster);
     uit.set(txt(m.uitdraai), uitdraai);
     if (modus === "kans1") {
-        const oud: Matrix = bladen.get(txt("blad_studenten")) as Matrix;
+        const oud: Matrix = studentenBlad as Matrix;
         const kop: Cel[] = oud[0].slice();
         const cols: number[] = EERSTE_KOP.map((naam: string) => {
             let c: number = kolom(kop, [norm(naam)]);

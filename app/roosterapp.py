@@ -36,12 +36,15 @@ HULP = """
   <li><b>Toetsdag_Kans1 / Toetsdag_Her</b> — één rij per lokaal per toetsdag: datum, lokaal, casus (en eventueel
       <i>Casus na pauze</i>), vaardigheid en beoordelaar. Wisselt de beoordelaar halverwege, vul dan <i>Beoordelaar 2</i>
       en <i>Wissel om</i> in.</li>
+  <li><b>Of in lijstvorm</b> — één blad met in kolom A de kopjes <i>datum, inzet, tijden, pauzes, lokalen, casussen, simu's</i>
+      en in kolom B de waarden eronder, zoals je het opschrijft. Uit een ander bestand: <i>Concept laden…</i> in de zijbalk.
+      ‘ochtend tot 13.00’ en ‘middag vanaf 13.30’ delen een lokaal; een naam met (opmerking) is reserve.</li>
   <li><b>Simu</b> — één rij per simucliënt per toetsdag, eventueel met <i>Vanaf</i>/<i>Tot</i>.
       Sneller: <i>Simu's importeren…</i> in de zijbalk neemt ze over uit het overzicht ‘Beschikbaarheid simu's’.</li>
   </ul></li>
 <li><b>Open de werkmap</b> hier (download hem eerst uit OneDrive/SharePoint).</li>
 <li>Controleer de <b>instellingen</b>: eerste en laatste toets, toetsduur, wisseltijd en pauzes. Daaruit worden alle
-  tijdslots gemaakt (standaard elke 20 minuten van 09:40 tot 17:00, met drie pauzes). Simu's schuiven na elke pauze een lokaal door.</li>
+  tijdslots gemaakt (standaard elke 20 minuten van 09:40 tot 17:00, met drie pauzes). Bij <i>Simu's wisselen van lokaal</i> kies je of simu's na elke pauze of na elke toets een lokaal doorschuiven.</li>
 <li>Kies <b>Eerste kans</b> of <b>Herkansing</b> en klik op <b>Rooster maken</b>.
   Kijk bij <i>Meldingen</i> of iedereen een plek heeft en of de opmerkingen goed zijn gelezen.</li>
 <li><b>Exporteer</b>:
@@ -162,6 +165,11 @@ class Venster(QMainWindow):
         sjabloon.setToolTip("Lege werkmap met de juiste bladen en kolommen om zelf in te vullen.")
         sjabloon.clicked.connect(self.sjabloon)
         lay.addWidget(sjabloon)
+        self.knop_concept = QPushButton("Concept laden…", cursor=Qt.PointingHandCursor)
+        self.knop_concept.setToolTip("Toetsdag in lijstvorm (datum, inzet, tijden, pauzes, lokalen, casussen, simu's) "
+                                     "uit een ander bestand in deze werkmap zetten.")
+        self.knop_concept.clicked.connect(lambda: self.laad_concept())
+        lay.addWidget(self.knop_concept)
         self.knop_import = QPushButton("Simu's importeren…", cursor=Qt.PointingHandCursor)
         self.knop_import.setToolTip("Simucliënten voor de toetsdag overnemen uit het overzicht ‘Beschikbaarheid simu's’.")
         self.knop_import.clicked.connect(lambda: self.importeer_simus())
@@ -286,6 +294,14 @@ class Venster(QMainWindow):
     # ---------------------------------------------------------------- weergave
 
     def toon_samenvatting(self):
+        c = self.concept() if self.bladen else None
+        if c and c["d"]:
+            s = rc.lees_instellingen(rc.instellingen_matrix(self.instellingen.waarden()), [])
+            c = rc.lees_concept(self.bladen[rc.vind_concept(self.bladen)], "", s, [], [])
+            self.samenvatting.setText(f"Concept {rc.datum_tekst(c['d'])} · {len({x['lokaal'] for x in c['slots']})} lokalen · "
+                                      f"toets {s['duur']} min · TTV {s['ttv']} min · {rc.tijd_tekst(s['start'])}–"
+                                      f"{rc.tijd_tekst(s['eind'])} · {len(s['pauzes'])} pauzes")
+            return
         s = self.instellingen.waarden()
         j = s["jaar"]
         tekst = f"Jaar {j} · toets {s[f'duur{j}']} min · TTV {s[f'ttv{j}']} min · "
@@ -306,6 +322,7 @@ class Venster(QMainWindow):
             s.zet("–")
         self.knop_maak.setEnabled(open_)
         self.knop_import.setEnabled(open_)
+        self.knop_concept.setEnabled(open_)
         for k in (self.knop_opslaan, self.knop_pdf, self.knop_pdf_rooster):
             k.setEnabled(False)
 
@@ -359,6 +376,7 @@ class Venster(QMainWindow):
         self.ingevoerd = {}  # in de app aangepaste invoerbladen (bijv. Simu na importeren); gaan mee bij opslaan
         self.instellingen.zet(rc.instellingen_waarden(bladen.get(rc.INSTELLINGEN_BLAD)))
         self.lbl_bestand.setText(Path(pad).name)
+        self.toon_samenvatting()
         n = max(0, len(bladen.get(self.instellingen.waarden()["blad_studenten"], [])) - 1)
         self.lbl_bestand_info.setText(f"{n} rijen studenten · {len(bladen)} bladen")
         self.toon_leeg()
@@ -453,8 +471,19 @@ class Venster(QMainWindow):
         titel = f"Toetsrooster {rc.MODI[self.resultaat['modus']]['naam'].lower()}"
         return doel and self._bewaar_pdf(doel, uitvoer.html_rooster(titel, self.resultaat["bladen"][namen["rooster"]]), True)
 
+    def concept(self) -> dict | None:
+        """Gegevens uit het conceptblad van de open werkmap (datum, aantal simu's nodig), of None."""
+        naam = rc.vind_concept(self.bladen or {})
+        if not naam:
+            return None
+        s = rc.lees_instellingen(rc.instellingen_matrix(self.instellingen.waarden()), [])
+        return rc.lees_concept(self.bladen[naam], naam, s, [], [])
+
     def toetsdatum(self) -> int:
-        """Eerste datum in het blad Toetsdag van de gekozen toets (anders vandaag)."""
+        """Datum uit het conceptblad of de eerste datum in het blad Toetsdag (anders vandaag)."""
+        c = self.concept()
+        if c and c["d"]:
+            return c["d"]
         w = self.instellingen.waarden()
         dag = self.bladen.get(w[rc.MODI[self.modus.waarde()]["dag"]]) or []
         c = rc.kolom(dag[0], "datum") if dag else -1
@@ -478,8 +507,12 @@ class Venster(QMainWindow):
         if not kolommen:
             QMessageBox.warning(self, "Geen datums gevonden", "Het overzicht heeft geen kolommen met simucliënten.")
             return False
-        dlg = SimuImport(kolommen, self.toetsdatum(), self)
+        c = self.concept()
+        dlg = SimuImport(kolommen, self.toetsdatum(), self, nodig=c["nodig"] if c and c["nodig"] else None)
         if not (kies(dlg) if kies else dlg.exec()):
+            return False
+        if not dlg.gekozen():
+            self.statusBar().showMessage("Niemand aangevinkt: het blad Simu is niet veranderd.")
             return False
         blad = self.instellingen.waarden()["blad_simu"]
         nieuw = uitvoer.simu_blad_met(self.bladen.get(blad), dlg.gekozen_datum(), dlg.gekozen())
@@ -487,6 +520,34 @@ class Venster(QMainWindow):
         self.verouderd()
         self.statusBar().showMessage(f"{len(dlg.gekozen())} simucliënt(en) voor {rc.datum_tekst(dlg.gekozen_datum())} in blad "
                                      f"{blad} gezet. Maak het rooster opnieuw; ‘Excel opslaan’ bewaart het blad.")
+        return True
+
+    def laad_concept(self, pad: str | None = None) -> bool:
+        """Conceptblad uit een ander bestand in de open werkmap zetten (als blad 'Concept')."""
+        if not pad:
+            pad, _ = QFileDialog.getOpenFileName(self, "Concept openen", str(Path(self.pad).parent), "Excel-werkmap (*.xlsx *.xlsm)")
+        if not pad:
+            return False
+        try:
+            bron = rc.lees_werkmap(pad)
+        except Exception as e:  # noqa: BLE001
+            QMessageBox.critical(self, "Kan concept niet openen", f"{pad}\n\n{e}")
+            return False
+        naam = rc.vind_concept(bron)
+        if not naam:
+            QMessageBox.warning(self, "Geen concept gevonden", "Geen blad met in kolom A de kopjes ‘lokalen’ en ‘tijden’ "
+                                "(of ‘inzet’), met de waarden eronder in kolom B.")
+            return False
+        # Het nieuwe concept vooraan, zodat het voor eventuele oudere conceptbladen gaat.
+        self.bladen = {"Concept": bron[naam], **{k: v for k, v in self.bladen.items() if k != "Concept"}}
+        self.ingevoerd["Concept"] = bron[naam]
+        for k, v in bron.items():  # studenten of simu's uit het conceptbestand alleen als ze hier nog ontbreken
+            if k != naam and rc.heeft_data(v) and not rc.heeft_data(self.bladen.get(k)):
+                self.bladen[k] = self.ingevoerd[k] = v
+        self.verouderd()
+        c = self.concept()
+        self.statusBar().showMessage(f"Concept geladen uit {Path(pad).name}" + (f" ({rc.datum_tekst(c['d'])})" if c and c["d"] else "")
+                                     + ". Maak het rooster opnieuw; ‘Excel opslaan’ bewaart het als blad ‘Concept’.")
         return True
 
     def sjabloon(self, doel: str | None = None) -> str | None:

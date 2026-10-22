@@ -157,3 +157,32 @@ def test_vrije_plekken_niet_in_pdf(tmp_path):
     assert sum(rc.VRIJ in rij for rij in rooster) == 24 and v.stat_in.waarde.text() == "61 / 61"
     html = uitvoer.html_rooster("t", rooster) + uitvoer.html_uitdraai("t", r["bladen"]["Uitdraai_Kans1"])
     assert rc.VRIJ not in html and html.count("<tr>") == 61 + 61 + 5 + 1  # 5 lokaalpagina's met kop, 1 uitdraaikop
+
+
+def test_concept_laden_en_import_zonder_passende_kolom(tmp_path):
+    bron = tmp_path / "werkmap.xlsx"
+    mv.schrijf(bron)
+    concept = tmp_path / "concept.xlsx"
+    from openpyxl import Workbook
+    wb = Workbook()
+    for rij in mv.concept_blad():
+        wb.active.append([None if c == "" else c for c in rij])
+    wb.save(concept)
+    beschikbaarheid(tmp_path / "b.xlsx")
+    app = roosterapp.QApplication.instance() or roosterapp.QApplication([])  # noqa: F841
+    v = roosterapp.Venster()
+    v.open(str(bron))
+    assert v.laad_concept(str(concept)) and "Concept 15-12-2026 · 7 lokalen" in v.samenvatting.text()
+    gezien = {}
+
+    def kies(dlg):  # 15-12 staat niet in het overzicht: niets voorgevinkt, OK uit
+        gezien.update(vink=len(dlg.gekozen()), ok=dlg.ok.isEnabled(), let_op=not dlg.waarschuwing.isHidden(), nodig=dlg.nodig)
+        return True
+    voor = [list(r) for r in v.bladen["Simu"]]
+    assert not v.importeer_simus(str(tmp_path / "b.xlsx"), kies)
+    assert gezien == {"vink": 0, "ok": False, "let_op": True, "nodig": 7} and v.bladen["Simu"] == voor
+    v.bladen["Simu"] = mv.concept_bladen()["Simu"]
+    r = v.maak()
+    assert r["fouten"] == [] and v.stat_in.waarde.text() == "61 / 61"
+    assert {rij[2] for rij in r["bladen"]["Rooster_Kans1"][1:]} == {"A1", "A2", "B1", "B2", "C1", "Praktijkhuis", "C2"}
+    assert "Concept" in rc.lees_werkmap(v.opslaan(str(tmp_path / "uit.xlsx")))
