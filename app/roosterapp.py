@@ -25,7 +25,7 @@ from onderdelen import InstellingenFormulier, Segment, SimuImport, StatKaart, la
 from thema import KLEUR
 
 HULP = """
-<h3>Zo maak je een rooster</h3>
+<style>li { margin-bottom: 6px; } h3 { margin-top: 18px; }</style><h3>Zo maak je een rooster</h3>
 <ol>
 <li><b>Vul de werkmap.</b> Begin met <i>Nieuw sjabloon…</i> in de zijbalk, of gebruik de werkmap van vorige keer:
   <ul>
@@ -262,7 +262,7 @@ class Venster(QMainWindow):
 
     def _hulp_pagina(self) -> QWidget:
         w, lay, _ = pagina("Hulp", "Van gegevens naar een rooster om te printen en te publiceren.")
-        tekst = label(HULP, wrap=True)
+        tekst = label(HULP, "hulp", wrap=True)
         tekst.setTextFormat(Qt.RichText)
         tekst.setMaximumWidth(760)
         tekst.setAlignment(Qt.AlignTop | Qt.AlignLeft)

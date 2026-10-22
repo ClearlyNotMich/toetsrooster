@@ -3,7 +3,7 @@
 Eén neutrale grijsschaal, één donkere primaire kleur, 1px randen, 8–10px afronding,
 36px hoge invoervelden. Kleur alleen voor status (waarschuwing/fout).
 """
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QColor, QFont, QPalette
 from PySide6.QtWidgets import QApplication
 
 KLEUR = {
@@ -27,7 +27,7 @@ KLEUR = {
 
 STIJL = """
 * {{ font-size: 13px; color: {tekst}; }}
-QMainWindow, QWidget#inhoud, QScrollArea, QWidget#instellingenInhoud {{ background: {achtergrond}; border: none; }}
+QMainWindow, QWidget#inhoud, QScrollArea, QScrollArea > QWidget > QWidget, QWidget#instellingenInhoud, QLabel#hulp {{ background: {achtergrond}; border: none; }}
 QToolTip {{ background: {primair}; color: {primair_tekst}; border: none; padding: 4px 8px; border-radius: 6px; }}
 
 /* zijbalk */
@@ -112,6 +112,18 @@ QStatusBar::item {{ border: none; }}
 
 def toepassen(app: QApplication) -> None:
     app.setStyle("Fusion")
+    # Altijd licht, ook als Windows/Linux in donkere modus staat (anders donkere vlakken met donkere tekst).
+    pal = QPalette()
+    for rol, kleur in ((QPalette.Window, "achtergrond"), (QPalette.Base, "achtergrond"), (QPalette.AlternateBase, "gedempt"),
+                       (QPalette.Button, "achtergrond"), (QPalette.WindowText, "tekst"), (QPalette.Text, "tekst"),
+                       (QPalette.ButtonText, "tekst"), (QPalette.ToolTipBase, "primair"), (QPalette.ToolTipText, "primair_tekst"),
+                       (QPalette.Highlight, "primair"), (QPalette.HighlightedText, "primair_tekst"),
+                       (QPalette.PlaceholderText, "gedempt_tekst"), (QPalette.Link, "tekst")):
+        pal.setColor(rol, QColor(KLEUR[kleur]))
+    pal.setColor(QPalette.Disabled, QPalette.Text, QColor(KLEUR["ring"]))
+    pal.setColor(QPalette.Disabled, QPalette.WindowText, QColor(KLEUR["ring"]))
+    pal.setColor(QPalette.Disabled, QPalette.ButtonText, QColor(KLEUR["ring"]))
+    app.setPalette(pal)
     font = QFont()
     # Eerste die op het systeem bestaat wint (Windows: Segoe UI; Linux: Inter/Noto/Cantarell).
     font.setFamilies(["Inter", "Segoe UI Variable Text", "Segoe UI", "Noto Sans", "Cantarell", "DejaVu Sans"])
