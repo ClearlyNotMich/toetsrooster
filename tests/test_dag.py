@@ -168,3 +168,28 @@ def test_oude_bladen_blijven_werken_als_toetsdag_leeg_is():
     del b["Slots_Kans1"]
     r = rc.maak_rooster(b, "kans1")  # geen oude slots meer: dan telt de (lege) toetsdag
     assert r["fouten"] == [] and len(rijen(r)) == 12 and all(x["bijzheden"] == rc.NIET for x in rijen(r))
+
+
+def test_datumnotaties():
+    goed = ["14-04-2026", "14-4-26", "2026-04-14", "2026/4/14", "14.04.2026", "14/04/2026", "14 april 2026",
+            "di 14 april 2026", "Dinsdag 14 april 2026", "14 apr. 2026", "14-04-2026 00:00", "2026-04-14 00:00:00",
+            "2026-04-14T00:00:00", "April 14, 2026", "14 Apr 26", "46126", 46126, 46126.5]
+    assert {g if rc.naar_datum(g) != 46126 else "ok" for g in goed} == {"ok"}
+    assert rc.naar_datum("3 mrt 2026") == rc.naar_datum("3 maart 2026") == rc.naar_datum("March 3, 2026") == 46084
+    for fout in ["14-4", "14 april", "31-02-2026", "1 foo 2026", "", "morgen", 0]:
+        assert rc.naar_datum(fout) is None, fout
+
+
+def test_datum_als_tekst_in_toetsdag_en_simu():
+    def tekst(b):
+        for rij, d in zip(b["Toetsdag_Kans1"][1:], ["14-4-26", "di 14 april 2026", "2026-04-14", "14/04/2026", "14 apr. 26"]):
+            rij[0] = d
+        for rij in b["Simu"][1:6]:
+            rij[0] = "dinsdag 14 april 2026"
+    r = plan(wijzig=tekst)
+    assert r["fouten"] == [] and sum(x["bijzheden"] != rc.VRIJ for x in rijen(r)) == 61
+
+    def zonder_jaar(b):
+        b["Toetsdag_Kans1"][1][0] = "14 april"
+    r = plan(wijzig=zonder_jaar)
+    assert len(r["fouten"]) == 1 and "'14 april'" in r["fouten"][0] and "14 april 2026" in r["fouten"][0]

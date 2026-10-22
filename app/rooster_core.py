@@ -138,16 +138,36 @@ def serie(j: int, m: int, d: int) -> int | None:
         return None
 
 
+MAAND = {"jan": 1, "feb": 2, "maa": 3, "mrt": 3, "mar": 3, "apr": 4, "mei": 5, "may": 5, "jun": 6, "jul": 7,
+         "aug": 8, "sep": 9, "okt": 10, "oct": 10, "nov": 11, "dec": 12}
+DATUM_VOORBEELD = "bijv. 14-04-2026, 14-4-26, 2026-04-14 of 14 april 2026"
+
+
+def jaar4(j: str) -> int:
+    return int(j) + 2000 if len(j) == 2 else int(j)
+
+
 def naar_datum(v) -> int | None:
+    """Excel-datum (getal) of tekst: 14-04-2026, 14/4/26, 14.04.2026, 2026-04-14, 2026/4/14,
+    14 april 2026, di 14 apr 26, April 14, 2026 — eventueel met tijd erachter. Zonder jaartal: None."""
     if isinstance(v, (int, float)) and not isinstance(v, bool):
         return math.floor(v) if v >= 1 else None
-    t = tekst(v)
-    m = re.fullmatch(r"(\d{4})-(\d{1,2})-(\d{1,2})", t)
+    t = re.sub(r"[\st]+\d{1,2}[:.]\d{2}([:.]\d{2})?$", "", tekst(v).lower()).strip()
+    if re.fullmatch(r"\d{5}(\.\d+)?", t):
+        return math.floor(float(t))
+    m = re.fullmatch(r"(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})", t)
     if m:
         return serie(int(m[1]), int(m[2]), int(m[3]))
-    m = re.fullmatch(r"(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})", t)
+    m = re.fullmatch(r"(\d{1,2})[-/.](\d{1,2})[-/.](\d{4}|\d{2})", t)
     if m:
-        return serie(int(m[3]), int(m[2]), int(m[1]))
+        return serie(jaar4(m[3]), int(m[2]), int(m[1]))
+    woorden = re.sub(r"[,.]", " ", t).split()
+    m = re.fullmatch(r"(?:[a-z]+ )?(\d{1,2}) ([a-z]+) (\d{4}|\d{2})", " ".join(woorden))
+    if m and m[2][:3] in MAAND:
+        return serie(jaar4(m[3]), MAAND[m[2][:3]], int(m[1]))
+    m = re.fullmatch(r"(?:[a-z]+ )?([a-z]+) (\d{1,2}) (\d{4}|\d{2})", " ".join(woorden))
+    if m and m[1][:3] in MAAND:
+        return serie(jaar4(m[3]), MAAND[m[1][:3]], int(m[2]))
     return None
 
 
@@ -367,7 +387,8 @@ def lees_slots(matrix: list | None, blad: str, fouten: list) -> list:
             continue
         d, t = naar_datum(cel(rij, kd)), naar_minuten(cel(rij, kt))
         if d is None or t is None or tekst(cel(rij, kl)) == "":
-            fouten.append(f"Blad '{blad}' rij {i + 1}: ongeldige of lege datum, tijd of lokaal.")
+            fouten.append(f"Blad '{blad}' rij {i + 1}: ongeldige of lege datum ('{tekst(cel(rij, kd))}'), tijd of lokaal "
+                          f"(datum {DATUM_VOORBEELD}).")
             continue
         slots.append({"n": len(slots), "d": d, "t": t, "lokaal": tekst(cel(rij, kl)), "casus": tekst(cel(rij, kc)),
                       "casus_na": tekst(cel(rij, kn)), "vaardigheid": tekst(cel(rij, kv))})
@@ -391,7 +412,8 @@ def lees_beschikbaar(matrix: list | None, blad: str, namen: tuple, fouten: list)
             continue
         d, t = naar_datum(cel(rij, kd)), naar_minuten(cel(rij, kt))
         if d is None or t is None:
-            fouten.append(f"Blad '{blad}' rij {i + 1}: ongeldige datum of tijd.")
+            fouten.append(f"Blad '{blad}' rij {i + 1}: ongeldige datum ('{tekst(cel(rij, kd))}') of tijd "
+                          f"(datum {DATUM_VOORBEELD}).")
             continue
         beschikbaar.setdefault(f"{d}_{t}", []).append(
             {"naam": naam, "casus": tekst(cel(rij, kc)), "lokaal": tekst(cel(rij, kl))})
@@ -432,7 +454,8 @@ def lees_toetsdag(matrix: list, blad: str, s: dict, fouten: list) -> tuple[list,
         d, lokaal, naam = naar_datum(cel(rij, kd)), tekst(cel(rij, kl)), tekst(cel(rij, kb))
         naam2, w = tekst(cel(rij, kb2)), naar_minuten(cel(rij, kw)) if tekst(cel(rij, kw)) else None
         if d is None or not lokaal or not naam:
-            fouten.append(f"Blad '{blad}' rij {i + 1}: vul een geldige datum, een lokaal en een beoordelaar in.")
+            fouten.append(f"Blad '{blad}' rij {i + 1}: vul een geldige datum ({DATUM_VOORBEELD}; nu "
+                          f"'{tekst(cel(rij, kd))}'), een lokaal en een beoordelaar in.")
             continue
         if bool(naam2) != (w is not None):
             fouten.append(f"Blad '{blad}' rij {i + 1}: vul 'Beoordelaar 2' en 'Wissel om' (een tijd) allebei in, "
@@ -466,7 +489,8 @@ def lees_simu_dag(matrix: list, blad: str, fouten: list) -> list:
         van = naar_minuten(cel(rij, kv)) if tekst(cel(rij, kv)) else None
         tot = naar_minuten(cel(rij, kt)) if tekst(cel(rij, kt)) else None
         if (tekst(cel(rij, kd)) and d is None) or (tekst(cel(rij, kv)) and van is None) or (tekst(cel(rij, kt)) and tot is None):
-            fouten.append(f"Blad '{blad}' rij {i + 1}: ongeldige datum, Vanaf of Tot.")
+            fouten.append(f"Blad '{blad}' rij {i + 1}: ongeldige datum ('{tekst(cel(rij, kd))}'), Vanaf of Tot "
+                          f"(datum {DATUM_VOORBEELD}).")
             continue
         lijst.append({"naam": naam, "d": d, "van": van, "tot": tot})
     return lijst

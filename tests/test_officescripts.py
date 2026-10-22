@@ -128,7 +128,18 @@ def dag_ongeldige_instellingen():
     return dag_met(pauzes="lunch", start="25:00")()
 
 
+def dag_datumtekst():
+    b = mv.dag_bladen()
+    for rij, d in zip(b["Toetsdag_Kans1"][1:], ["14-4-26", "di 14 april 2026", "2026-04-14T00:00:00", "14/04/2026", "April 14, 2026"]):
+        rij[0] = d
+    for rij in b["Simu"][1:6]:
+        rij[0] = "14-04-2026 00:00"
+    b["Toetsdag_Her"][2][0] = "27 mei"  # zonder jaar -> fout met voorbeeld
+    return b
+
+
 SCENARIOS = {
+    "dag_datumtekst": dag_datumtekst,
     "dag": mv.dag_bladen,
     "dag_anders": dag_met(simu_rotatie="Nee", casus_na="Na elke pauze afwisselen", ttv_plek="Zo vroeg mogelijk",
                           ttv_eerst="Nee", vrije_plekken="Nee", wissel=10, pauzes="12:30-13:15", middag="13:00",

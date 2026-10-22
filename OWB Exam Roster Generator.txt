@@ -224,18 +224,42 @@ function serie(j: number, m: number, d: number): number | null {
     return Math.round((x.getTime() - NUL) / 86400000);
 }
 
+const MAAND: Map<string, number> = new Map<string, number>([
+    ["jan", 1], ["feb", 2], ["maa", 3], ["mrt", 3], ["mar", 3], ["apr", 4], ["mei", 5], ["may", 5], ["jun", 6], ["jul", 7],
+    ["aug", 8], ["sep", 9], ["okt", 10], ["oct", 10], ["nov", 11], ["dec", 12],
+]);
+const DATUM_VOORBEELD: string = "bijv. 14-04-2026, 14-4-26, 2026-04-14 of 14 april 2026";
+
+function jaar4(j: string): number {
+    return j.length === 2 ? Number(j) + 2000 : Number(j);
+}
+
+// Excel-datum (getal) of tekst: 14-04-2026, 14/4/26, 14.04.2026, 2026-04-14, 2026/4/14,
+// 14 april 2026, di 14 apr 26, April 14, 2026 — eventueel met tijd erachter. Zonder jaartal: null.
 function naarDatum(v: Cel): number | null {
     if (typeof v === "number") {
         return v >= 1 ? Math.floor(v) : null;
     }
-    const t: string = tekst(v);
-    let m: RegExpMatchArray | null = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    const t: string = tekst(v).toLowerCase().replace(/[\st]+\d{1,2}[:.]\d{2}([:.]\d{2})?$/, "").trim();
+    if (/^\d{5}(\.\d+)?$/.test(t)) {
+        return Math.floor(Number(t));
+    }
+    let m: RegExpMatchArray | null = t.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
     if (m) {
         return serie(Number(m[1]), Number(m[2]), Number(m[3]));
     }
-    m = t.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
+    m = t.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4}|\d{2})$/);
     if (m) {
-        return serie(Number(m[3]), Number(m[2]), Number(m[1]));
+        return serie(jaar4(m[3]), Number(m[2]), Number(m[1]));
+    }
+    const woorden: string = t.replace(/[,.]/g, " ").split(/\s+/).filter((w: string) => w !== "").join(" ");
+    m = woorden.match(/^(?:[a-z]+ )?(\d{1,2}) ([a-z]+) (\d{4}|\d{2})$/);
+    if (m && MAAND.has(m[2].slice(0, 3))) {
+        return serie(jaar4(m[3]), MAAND.get(m[2].slice(0, 3)) as number, Number(m[1]));
+    }
+    m = woorden.match(/^(?:[a-z]+ )?([a-z]+) (\d{1,2}) (\d{4}|\d{2})$/);
+    if (m && MAAND.has(m[1].slice(0, 3))) {
+        return serie(jaar4(m[3]), MAAND.get(m[1].slice(0, 3)) as number, Number(m[2]));
     }
     return null;
 }
@@ -523,7 +547,8 @@ function leesSlots(matrix: Matrix | undefined, blad: string, fouten: string[]): 
         const d: number | null = naarDatum(cel(rij, kd));
         const t: number | null = naarMinuten(cel(rij, kt));
         if (d === null || t === null || tekst(cel(rij, kl)) === "") {
-            fouten.push(`Blad '${blad}' rij ${i + 1}: ongeldige of lege datum, tijd of lokaal.`);
+            fouten.push(`Blad '${blad}' rij ${i + 1}: ongeldige of lege datum ('${tekst(cel(rij, kd))}'), tijd of lokaal ` +
+                `(datum ${DATUM_VOORBEELD}).`);
             continue;
         }
         slots.push({
@@ -559,7 +584,8 @@ function leesBeschikbaar(matrix: Matrix | undefined, blad: string, namen: string
         const d: number | null = naarDatum(cel(rij, kd));
         const t: number | null = naarMinuten(cel(rij, kt));
         if (d === null || t === null) {
-            fouten.push(`Blad '${blad}' rij ${i + 1}: ongeldige datum of tijd.`);
+            fouten.push(`Blad '${blad}' rij ${i + 1}: ongeldige datum ('${tekst(cel(rij, kd))}') of tijd ` +
+                `(datum ${DATUM_VOORBEELD}).`);
             continue;
         }
         const sleutel: string = `${d}_${t}`;
@@ -618,7 +644,8 @@ function leesToetsdag(matrix: Matrix, blad: string, tijden: number[], fouten: st
         const naam2: string = tekst(cel(rij, kb2));
         const w: number | null = tekst(cel(rij, kw)) ? naarMinuten(cel(rij, kw)) : null;
         if (d === null || !lokaal || !naam) {
-            fouten.push(`Blad '${blad}' rij ${i + 1}: vul een geldige datum, een lokaal en een beoordelaar in.`);
+            fouten.push(`Blad '${blad}' rij ${i + 1}: vul een geldige datum (${DATUM_VOORBEELD}; nu ` +
+                `'${tekst(cel(rij, kd))}'), een lokaal en een beoordelaar in.`);
             continue;
         }
         if ((naam2 !== "") !== (w !== null)) {
@@ -663,7 +690,8 @@ function leesSimuDag(matrix: Matrix, blad: string, fouten: string[]): SimuDag[] 
         const van: number | null = tekst(cel(rij, kv)) ? naarMinuten(cel(rij, kv)) : null;
         const tot: number | null = tekst(cel(rij, kt)) ? naarMinuten(cel(rij, kt)) : null;
         if ((tekst(cel(rij, kd)) && d === null) || (tekst(cel(rij, kv)) && van === null) || (tekst(cel(rij, kt)) && tot === null)) {
-            fouten.push(`Blad '${blad}' rij ${i + 1}: ongeldige datum, Vanaf of Tot.`);
+            fouten.push(`Blad '${blad}' rij ${i + 1}: ongeldige datum ('${tekst(cel(rij, kd))}'), Vanaf of Tot ` +
+                `(datum ${DATUM_VOORBEELD}).`);
             continue;
         }
         lijst.push({ naam: naam, d: d, van: van, tot: tot });
