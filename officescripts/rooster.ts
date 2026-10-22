@@ -27,7 +27,9 @@ interface Student {
     i: number; nr: string; voornaam: string; tv: string; achternaam: string; klas: string;
     verboden: string[]; ttv: boolean; her: boolean; eb: string; ec: string; voorkeur: string; opm: string;
 }
-interface SimuDag { naam: string; d: number | null; van: number | null; tot: number | null; vast: string; }
+interface SimuDag { naam: string; d: number | null; van: number | null; tot: number | null; vast: string; kan: string[]; }
+interface Kenmerk { naam: string; tags: string[]; }
+interface Eenheid { d: number; lokaal: Kenmerk; casus: Kenmerk; casusNa: Kenmerk; vaardigheid: string; naam: string; naam2: string; w: number | null; }
 interface Bereik { d: number; b: number; a: number; e: number; ks: string[]; }
 interface Inst { w: Map<string, Cel>; pauzes: number[][]; }
 interface Inzet { naam: string; tekst: string; opm: string; tot: number | null; van: number | null; }
@@ -589,8 +591,80 @@ function heeftData(matrix: Matrix | undefined): boolean {
     return !!matrix && matrix.length > 0 && matrix.slice(1).some((r: Cel[]) => !leeg(r));
 }
 
+// 'C1.36 (keuken)' -> C1.36 met ['keuken']; 'K3 vrouw (keuken, rolstoel)' -> K3 vrouw met ['keuken', 'rolstoel'].
+function kenmerken(v: Cel): Kenmerk {
+    const t: string = tekst(v);
+    const tags: string[] = [];
+    const re: RegExp = /\(([^)]*)\)/g;
+    let m: RegExpExecArray | null = re.exec(t);
+    while (m) {
+        m[1].split(/[,;\/]/).map((x: string) => x.trim()).filter((x: string) => x !== "").forEach((x: string) => tags.push(x));
+        m = re.exec(t);
+    }
+    return { naam: t.replace(/\s*\([^)]*\)/g, "").trim(), tags: tags };
+}
+
+function pastBij(eisen: string[], tags: string[]): boolean {
+    const genormd: string[] = tags.map((x: string) => norm(x));
+    return eisen.every((e: string) => genormd.indexOf(norm(e)) >= 0);
+}
+
+function heelWoord(t: string, woord: string): boolean {
+    const veilig: string = woord.toLowerCase().trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp("(^|[^a-z0-9])" + veilig + "($|[^a-z0-9])").test(t.toLowerCase());
+}
+
+// Kan een simu met 'Kan spelen' = kan (bijv. ['vrouw'] of ['P1', 'P2']) deze casus spelen? Leeg = alles.
+function speelt(kan: string[], casus: string): boolean {
+    return kan.length === 0 || kan.some((k: string) => norm(k) === norm(casus) || heelWoord(casus, k));
+}
+
+// Welk lokaal krijgt eenheid k (casus + beoordelaar)? Eenheden met eisen ('keuken') eerst, de meest beperkte
+// voorop, bij voorkeur in hun eigen lokaal; daarna de rest op volgorde. Geeft per k een lokaalindex (of -1).
+function koppelLokalen(lokalen: Kenmerk[], eisen: string[][]): number[] {
+    const n: number = lokalen.length;
+    const uit: number[] = eisen.map(() => -1);
+    const bezet: number[] = [];
+    const opties = (k: number): number[] => (k < n ? [k] : []).concat(lokalen.map((_: Kenmerk, j: number) => j))
+        .filter((j: number) => bezet.indexOf(j) < 0);
+    const aantal = (k: number): number => lokalen.filter((l: Kenmerk) => pastBij(eisen[k], l.tags)).length;
+    const metEis: number[] = eisen.map((_: string[], k: number) => k).filter((k: number) => eisen[k].length > 0)
+        .sort((a: number, b: number) => vergelijk([aantal(a), a], [aantal(b), b]));
+    for (const k of metEis) {
+        const j: number[] = opties(k).filter((x: number) => pastBij(eisen[k], lokalen[x].tags));
+        if (j.length > 0) {
+            uit[k] = j[0];
+            bezet.push(j[0]);
+        }
+    }
+    for (let k: number = 0; k < eisen.length; k++) {
+        if (uit[k] < 0 && opties(k).length > 0) {
+            uit[k] = opties(k)[0];
+            bezet.push(uit[k]);
+        }
+    }
+    return uit;
+}
+
+function meldKoppeling(lokalen: Kenmerk[], casussen: string[], eisen: string[][], uit: number[], d: number, meldingen: Cel[][]): void {
+    uit.forEach((j: number, k: number) => {
+        if (j < 0) {
+            return;
+        }
+        if (eisen[k].length > 0 && !pastBij(eisen[k], lokalen[j].tags)) {
+            meldingen.push(["Waarschuwing", `Casus ${casussen[k]} vraagt ${eisen[k].join(", ")}, maar op ${datumTekst(d)} ` +
+                `is daar geen vrij lokaal voor; staat nu in ${lokalen[j].naam}.`]);
+        } else if (j !== k && k < lokalen.length) {
+            meldingen.push(["Info", `Casus ${casussen[k]} staat in lokaal ${lokalen[j].naam} ` +
+                `(${eisen[k].join(", ") || "ruil"}) in plaats van ${lokalen[k].naam}.`]);
+        }
+    });
+}
+
 // Blad Toetsdag (één rij per lokaal per dag) -> slots en beschikbare beoordelaars per slot.
-function leesToetsdag(matrix: Matrix, blad: string, tijden: number[], fouten: string[], slots: Slot[], beo: Map<string, Persoon[]>): void {
+// Kenmerken tussen haakjes: 'C1.36 (keuken)' en casus 'K3 (keuken)' -> die casus (met beoordelaar) gaat naar dat lokaal.
+function leesToetsdag(matrix: Matrix, blad: string, tijden: number[], fouten: string[], meldingen: Cel[][],
+    slots: Slot[], beo: Map<string, Persoon[]>): void {
     const kop: Cel[] = matrix[0];
     const kd: number = kolom(kop, ["datum"]);
     const kl: number = kolom(kop, ["lokaal"]);
@@ -604,6 +678,7 @@ function leesToetsdag(matrix: Matrix, blad: string, tijden: number[], fouten: st
         fouten.push(`Blad '${blad}': kolommen 'Datum', 'Lokaal' en 'Beoordelaar' zijn verplicht.`);
         return;
     }
+    const eenheden: Eenheid[] = [];
     const gezien: string[] = [];
     for (let i: number = 1; i < matrix.length; i++) {
         const rij: Cel[] = matrix[i];
@@ -611,11 +686,11 @@ function leesToetsdag(matrix: Matrix, blad: string, tijden: number[], fouten: st
             continue;
         }
         const d: number | null = naarDatum(cel(rij, kd));
-        const lokaal: string = tekst(cel(rij, kl));
+        const lokaal: Kenmerk = kenmerken(cel(rij, kl));
         const naam: string = tekst(cel(rij, kb));
         const naam2: string = tekst(cel(rij, kb2));
         const w: number | null = tekst(cel(rij, kw)) ? naarMinuten(cel(rij, kw)) : null;
-        if (d === null || !lokaal || !naam) {
+        if (d === null || !lokaal.naam || !naam) {
             fouten.push(`Blad '${blad}' rij ${i + 1}: vul een geldige datum (${DATUM_VOORBEELD}; nu ` +
                 `'${tekst(cel(rij, kd))}'), een lokaal en een beoordelaar in.`);
             continue;
@@ -625,18 +700,39 @@ function leesToetsdag(matrix: Matrix, blad: string, tijden: number[], fouten: st
                 "of laat beide leeg.");
             continue;
         }
-        if (gezien.indexOf(`${d}_${norm(lokaal)}`) >= 0) {
-            fouten.push(`Blad '${blad}' rij ${i + 1}: lokaal ${lokaal} staat al eerder op ${datumTekst(d)}.`);
+        if (gezien.indexOf(`${d}_${norm(lokaal.naam)}`) >= 0) {
+            fouten.push(`Blad '${blad}' rij ${i + 1}: lokaal ${lokaal.naam} staat al eerder op ${datumTekst(d)}.`);
             continue;
         }
-        gezien.push(`${d}_${norm(lokaal)}`);
-        for (const t of tijden) {
-            slots.push({
-                n: slots.length, d: d, t: t, lokaal: lokaal, casus: tekst(cel(rij, kc)),
-                casusNa: tekst(cel(rij, kn)), vaardigheid: tekst(cel(rij, kv)),
-            });
-            beo.set(`${d}_${t}_${norm(lokaal)}`, [{ naam: naam2 && w !== null && t >= w ? naam2 : naam, casus: "", lokaal: "" }]);
-        }
+        gezien.push(`${d}_${norm(lokaal.naam)}`);
+        eenheden.push({
+            d: d, lokaal: lokaal, casus: kenmerken(cel(rij, kc)), casusNa: kenmerken(cel(rij, kn)),
+            vaardigheid: tekst(cel(rij, kv)), naam: naam, naam2: naam2, w: w,
+        });
+    }
+    const datums: number[] = [];
+    eenheden.forEach((e: Eenheid) => { if (datums.indexOf(e.d) < 0) { datums.push(e.d); } });
+    for (const d of datums) {
+        const rijen: Eenheid[] = eenheden.filter((e: Eenheid) => e.d === d);
+        const lokalen: Kenmerk[] = rijen.map((e: Eenheid) => e.lokaal);
+        const eisen: string[][] = rijen.map((e: Eenheid) => e.casus.tags);
+        const plek: number[] = koppelLokalen(lokalen, eisen);
+        meldKoppeling(lokalen, rijen.map((e: Eenheid) => e.casus.naam), eisen, plek, d, meldingen);
+        rijen.forEach((e: Eenheid, k: number) => {
+            const kamer: Kenmerk = lokalen[plek[k]];
+            if (e.casusNa.tags.length > 0 && !pastBij(e.casusNa.tags, kamer.tags)) {
+                meldingen.push(["Waarschuwing", `Casus na pauze ${e.casusNa.naam} vraagt ${e.casusNa.tags.join(", ")}, ` +
+                    `maar lokaal ${kamer.naam} heeft dat niet.`]);
+            }
+            for (const t of tijden) {
+                slots.push({
+                    n: slots.length, d: d, t: t, lokaal: kamer.naam, casus: e.casus.naam,
+                    casusNa: e.casusNa.naam, vaardigheid: e.vaardigheid,
+                });
+                beo.set(`${d}_${t}_${norm(kamer.naam)}`,
+                    [{ naam: e.naam2 && e.w !== null && t >= e.w ? e.naam2 : e.naam, casus: "", lokaal: "" }]);
+            }
+        });
     }
 }
 
@@ -649,6 +745,7 @@ function leesSimuDag(matrix: Matrix, blad: string, fouten: string[], meldingen: 
     const kv: number = kolom(kop, ["vanaf", "van"]);
     const kt: number = kolom(kop, ["tot"]);
     const kl: number = kolom(kop, ["vastlokaal"]);
+    const kk: number = kolom(kop, ["kanspelen"]);
     const lijst: SimuDag[] = [];
     if (kn < 0) {
         fouten.push(`Blad '${blad}': kolom 'simucliënt' ontbreekt.`);
@@ -675,7 +772,7 @@ function leesSimuDag(matrix: Matrix, blad: string, fouten: string[], meldingen: 
         }
         const vast: string = tekst(cel(rij, kl));
         lijst.push({
-            naam: naam, d: d, van: van, tot: tot,
+            naam: naam, d: d, van: van, tot: tot, kan: namenLijst(cel(rij, kk)),
             vast: ["", "nee", "n", "wisselt"].indexOf(norm(vast)) >= 0 ? "" : waar(vast) ? "ja" : vast,
         });
     }
@@ -797,7 +894,7 @@ function simuRotatie(slots: Slot[], simus: SimuDag[], pz: number[][], duur: numb
         const plek: number = kamersRot.indexOf(lokaal) >= 0 ? kamersRot.indexOf(lokaal) : alleKamers.indexOf(lokaal);
         const k: number = wissel.length > 0 ? (plek + stap(slot.d, slot.t)) % wissel.length : 0;
         const lijst: Persoon[] = eigen.concat(wissel.slice(k), wissel.slice(0, k))
-            .filter((x: SimuDag) => kan(x, slot.t, slot.t + duur))
+            .filter((x: SimuDag) => kan(x, slot.t, slot.t + duur) && speelt(x.kan, slot.casus))
             .map((x: SimuDag) => ({ naam: x.naam, casus: "", lokaal: "" }));
         if (lijst.length > 0) {
             uit.set(`${slot.d}_${slot.t}_${norm(slot.lokaal)}`, lijst);
@@ -808,8 +905,25 @@ function simuRotatie(slots: Slot[], simus: SimuDag[], pz: number[][], duur: numb
     let ietsGekozen: boolean = false;
     gekozen.forEach((g: SimuDag[]) => { ietsGekozen = ietsGekozen || g.length > 0; });
     if (zonder > 0 && ietsGekozen) {
-        meldingen.push(["Info", `${zonder} slot(s) zonder beschikbare simucliënt (bijv. vóór 'Vanaf' of na 'Tot' in ` +
-            "het blad Simu); daar wordt niemand ingeroosterd."]);
+        meldingen.push(["Info", `${zonder} slot(s) zonder beschikbare simucliënt (vóór 'Vanaf', na 'Tot', of niemand die ` +
+            "die casus kan spelen); daar wordt niemand ingeroosterd."]);
+    }
+    const gemeld: string[] = [];
+    for (const slot of slots) { // casus die niemand van die dag kan spelen, en vaste simu's die hun casus niet kunnen spelen
+        const dieDag: SimuDag[] = simus.filter((x: SimuDag) => x.d === null || x.d === slot.d);
+        let sleutel: string = `${slot.d}_${slot.casus}`;
+        if (dieDag.length > 0 && gemeld.indexOf(sleutel) < 0 && !dieDag.some((x: SimuDag) => speelt(x.kan, slot.casus))) {
+            gemeld.push(sleutel);
+            meldingen.push(["Waarschuwing", `Casus ${slot.casus} op ${datumTekst(slot.d)}: geen simucliënt die ` +
+                "deze casus kan spelen (kolom 'Kan spelen' in het blad Simu)."]);
+        }
+        const h: SimuDag | undefined = (thuis.get(slot.d) as Map<string, SimuDag>).get(norm(slot.lokaal));
+        sleutel = `${slot.d}_${h ? h.naam : ""}_${slot.casus}`;
+        if (h && !speelt(h.kan, slot.casus) && gemeld.indexOf(sleutel) < 0) {
+            gemeld.push(sleutel);
+            meldingen.push(["Waarschuwing", `${h.naam} staat vast in ${slot.lokaal}, maar kan casus ${slot.casus} ` +
+                "niet spelen; daar spelen dan de anderen."]);
+        }
     }
     return uit;
 }
@@ -930,9 +1044,12 @@ function leesConcept(matrix: Matrix, blad: string, inst: Inst, fouten: string[],
         s.set("start", tijden[0]);
         s.set("eind", Math.max(...tijden) + duur);
     }
-    const lokalen: string[] = lijst("lokalen").map((v: Cel) => tekst(v));
-    const casus: string[] = lijst("casus").map((v: Cel) => tekst(v));
-    const casusNa: string[] = lijst("casus_na").map((v: Cel) => tekst(v));
+    const kamers: Kenmerk[] = lijst("lokalen").map((v: Cel) => kenmerken(v));
+    const lokalen: string[] = kamers.map((x: Kenmerk) => x.naam);
+    const casusK: Kenmerk[] = lijst("casus").map((v: Cel) => kenmerken(v));
+    const casusNaK: Kenmerk[] = lijst("casus_na").map((v: Cel) => kenmerken(v));
+    const casus: string[] = casusK.map((x: Kenmerk) => x.naam);
+    const casusNa: string[] = casusNaK.map((x: Kenmerk) => x.naam);
     const vaardigheid: string[] = lijst("vaardigheid").map((v: Cel) => tekst(v));
     if (casus.length !== lokalen.length) {
         meldingen.push(["Waarschuwing", `Blad '${blad}': ${lokalen.length} lokalen maar ${casus.length} casussen; ` +
@@ -960,8 +1077,19 @@ function leesConcept(matrix: Matrix, blad: string, inst: Inst, fouten: string[],
     const overig: Inzet[] = [];
     perLokaal.slice(lokalen.length).forEach((k: Inzet[]) => { k.forEach((q: Inzet) => overig.push(q)); });
     overig.concat(reserve).forEach((p: Inzet) => meldingen.push(["Info", `Niet ingedeeld (reserve): ${p.tekst}.`]));
+    // Casus k (met beoordelaar en vaardigheid) naar een lokaal dat de gevraagde kenmerken heeft, bijv. (keuken).
+    const eisen: string[][] = lokalen.map((_: string, k: number) => k < casusK.length ? casusK[k].tags : []);
+    const plek: number[] = koppelLokalen(kamers, eisen);
+    if (d !== null) {
+        meldKoppeling(kamers, lokalen.map((_: string, k: number) => k < casus.length ? casus[k] : ""), eisen, plek, d, meldingen);
+    }
     const indeling: string[] = [];
-    lokalen.forEach((lokaal: string, k: number) => {
+    lokalen.forEach((_: string, k: number) => {
+        const lokaal: string = lokalen[plek[k]];
+        if (k < casusNaK.length && casusNaK[k].tags.length > 0 && !pastBij(casusNaK[k].tags, kamers[plek[k]].tags)) {
+            meldingen.push(["Waarschuwing", `Casus na pauze ${casusNa[k]} vraagt ${casusNaK[k].tags.join(", ")}, ` +
+                `maar lokaal ${lokaal} heeft dat niet.`]);
+        }
         const wie: Inzet[] = k < perLokaal.length ? perLokaal[k] : [];
         indeling.push(`${lokaal} ${wie.map((p: Inzet) => wieTekst(p)).join(" → ") || "(geen beoordelaar)"}`);
         if (wie.length === 0) {
@@ -1060,7 +1188,7 @@ function maakRooster(bladen: Map<string, Matrix>, modus: string): Resultaat {
         fouten.push(`Blad '${txt(m.dag)}' ontbreekt of is leeg.`);
     } else if (dagmodus) {
         const tijden: number[] = tijdgrid(num("start"), num("eind"), num("duur"), num("wissel"), pz);
-        leesToetsdag(dag as Matrix, txt(m.dag), tijden, fouten, slots, beoordelaars);
+        leesToetsdag(dag as Matrix, txt(m.dag), tijden, fouten, meldingen, slots, beoordelaars);
     } else {
         slots = leesSlots(oudeSlots, txt(m.slots), fouten);
         beoordelaars = leesBeschikbaar(bladen.get(txt("blad_beo")), txt("blad_beo"), ["beoordelaar", "naam"], fouten);

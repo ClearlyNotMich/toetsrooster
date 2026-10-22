@@ -318,3 +318,88 @@ def test_simu_vast_lokaal_fouten_en_zonder_wissel_instelling():
     tekst = " ".join(m[1] for m in r["meldingen"])
     assert "Siem: vast lokaal 'Z9' bestaat niet" in tekst and "Uma: lokaal A1 is al vast voor Tom" in tekst
     assert {x["simucliënt"] for x in rijen(r) if x["Lokaal"] == "A1"} == {"Tom"}
+
+
+# ---------------------------------------------------------------- kenmerken (keuken) en 'Kan spelen'
+
+def test_kenmerken_en_koppelen():
+    assert rc.kenmerken("C1.36 (keuken)") == ("C1.36", ["keuken"])
+    assert rc.kenmerken("K3 vrouw (keuken, rolstoel)") == ("K3 vrouw", ["keuken", "rolstoel"])
+    assert rc.kenmerken("A1") == ("A1", [])
+    kamers = [("A1", []), ("A2", ["keuken"]), ("B1", []), ("B2", ["keuken"])]
+    # casus 0 en 1 willen een keuken, 2 en 3 niet: keukencasussen naar A2/B2, de rest vult op volgorde
+    assert rc.koppel_lokalen(kamers, [["keuken"], ["keuken"], [], []]) == [1, 3, 2, 0]
+    assert rc.koppel_lokalen(kamers, [[], ["keuken"], [], []]) == [0, 1, 2, 3]  # staat al goed: niets verschuift
+    assert rc.koppel_lokalen(kamers, [["keuken"]] * 3 + [[]])[2] in (0, 2)  # derde keukencasus past niet meer
+    assert rc.speelt(["vrouw"], "P3 vrouw") and not rc.speelt(["vrouw"], "P1 man") and rc.speelt([], "P1 man")
+    assert rc.speelt(["P1", "P2"], "P2 man") and not rc.speelt(["P1"], "P10 man") and not rc.speelt(["man"], "P3 vrouw")
+
+
+def met_keuken(b):
+    blad = b["Concept"]
+    lok = [i for i, r in enumerate(blad) if r[0] == "lokalen"][0]
+    cas = [i for i, r in enumerate(blad) if r[0] == "casussen"][0]
+    blad[lok + 3][1] = "B2 (keuken)"   # 4e lokaal
+    blad[lok + 5][1] = "Praktijkhuis (keuken)"
+    blad[cas][1] = "K1 man (keuken)"   # 1e casus (Ann) wil een keuken
+    blad[cas + 6][1] = "K7 vrouw (keuken)"  # 7e casus (Fien/Hans) ook
+
+
+def test_concept_casus_naar_keuken():
+    r = concept(met_keuken)
+    assert r["fouten"] == []
+    alle = rijen(r)
+    per_casus = {x["Casus"]: (x["Lokaal"], x["Beoordelaar"]) for x in alle if x["Tijd"] * 1440 < 700}
+    assert per_casus["K1 man"] == ("B2", "Ann")  # beoordelaar verhuist mee met de casus
+    assert per_casus["K7 vrouw"][0] == "Praktijkhuis" and per_casus["K7 vrouw"][1] == "Fien"
+    assert all("(" not in x["Lokaal"] and "(" not in x["Casus"] for x in alle)  # kenmerken niet in het rooster
+    assert any("Casus K1 man staat in lokaal B2 (keuken) in plaats van A1" in m[1] for m in r["meldingen"])
+    assert sum(x["bijzheden"] != rc.VRIJ for x in alle) == 61
+
+
+def test_te_weinig_keukens_geeft_waarschuwing():
+    def drie(b):
+        met_keuken(b)
+        cas = [i for i, r in enumerate(b["Concept"]) if r[0] == "casussen"][0]
+        b["Concept"][cas + 2][1] = "K3 vrouw (keuken)"
+    r = concept(drie)
+    tekst = " ".join(m[1] for m in r["meldingen"])
+    assert tekst.count("vraagt keuken, maar op 15-12-2026 is daar geen vrij lokaal voor") == 1  # 3 keukencasussen, 2 keukens
+    keuken = {x["Casus"] for x in rijen(r) if x["Lokaal"] in ("B2", "Praktijkhuis")}
+    assert len(keuken) == 2 and keuken <= {"K1 man", "K3 vrouw", "K7 vrouw"}
+
+
+def test_toetsdag_blad_met_keuken():
+    def keuken(b):
+        b["Toetsdag_Kans1"][5][1] = "C1.39 (keuken)"
+        b["Toetsdag_Kans1"][1][2] = "Q 1 (keuken)"
+    r = plan(wijzig=keuken)
+    per = {x["Casus"]: (x["Lokaal"], x["Beoordelaar"]) for x in rijen(r) if x["Tijd"] * 1440 < 700}
+    assert per["Q 1"] == ("C1.39", "Ann") and per["I 1"][0] == "C1.33-1"
+
+
+def test_simu_kan_spelen():
+    def gender(b):
+        b["Instellingen"] = rc.instellingen_matrix({"simu_rotatie": "Na elke toets"})
+        b["Simu"][0] += ["Vast lokaal", "Kan spelen"]
+        kan = ["man", "man", "vrouw", "vrouw", "vrouw", "vrouw", "man", ""]
+        for rij, k in zip(b["Simu"][1:], kan):
+            rij += ["", k]
+    r = concept(gender)
+    alle = rijen(r)
+    simu_kan = dict(zip(["Siem", "Tom", "Uma", "Vera", "Wout", "Xan", "Yara"], ["man", "man", "vrouw", "vrouw", "vrouw", "vrouw", "man"]))
+    for x in alle:
+        assert simu_kan[x["simucliënt"]] in x["Casus"], (x["simucliënt"], x["Casus"])
+    assert sum(x["bijzheden"] != rc.VRIJ for x in alle) == 61
+    assert len({x["simucliënt"] for x in alle if x["Lokaal"] == "A1"}) > 1  # wisselt nog steeds, binnen 'man'
+
+
+def test_casus_zonder_passende_simu():
+    def niemand(b):
+        b["Simu"][0].append("Kan spelen")
+        for rij in b["Simu"][1:]:
+            rij.append("man")
+    r = concept(niemand)
+    tekst = " ".join(m[1] for m in r["meldingen"])
+    assert "Casus K3 vrouw op 15-12-2026: geen simucliënt die deze casus kan spelen" in tekst
+    assert not [x for x in rijen(r) if "vrouw" in x["Casus"] and x["bijzheden"] != rc.VRIJ]

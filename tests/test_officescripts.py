@@ -180,7 +180,38 @@ def concept_vaste_simus(rotatie):
     return maak
 
 
+def concept_keuken_en_kan_spelen():
+    b = mv.concept_bladen()
+    blad = b["Concept"]
+    lok = [i for i, r in enumerate(blad) if r[0] == "lokalen"][0]
+    cas = [i for i, r in enumerate(blad) if r[0] == "casussen"][0]
+    blad[lok + 3][1] = "B2 (keuken)"
+    blad[lok + 5][1] = "Praktijkhuis (keuken, tillift)"
+    blad[cas][1] = "K1 man (keuken)"
+    blad[cas + 2][1] = "K3 vrouw (keuken)"
+    blad[cas + 6][1] = "K7 vrouw (keuken; tillift)"
+    b["Instellingen"] = rc.instellingen_matrix({"simu_rotatie": "Na elke toets"})
+    b["Simu"][0] += ["Vast lokaal", "Kan spelen"]
+    for rij, (v, k) in zip(b["Simu"][1:], [("", "man"), ("Ja", "man"), ("", "vrouw"), ("", "vrouw / K1"), ("C2", "man"),
+                                           ("", "vrouw"), ("", ""), ("", "")]):
+        rij += [v, k]
+    return b
+
+
+def toetsdag_keuken():
+    b = mv.dag_bladen()
+    b["Toetsdag_Kans1"][5][1] = "C1.39 (keuken)"
+    b["Toetsdag_Kans1"][1][2] = "Q 1 (keuken)"
+    b["Toetsdag_Kans1"][2][3] = "R 1b (keuken)"  # casus na pauze in een lokaal zonder keuken
+    b["Simu"][0].append("Kan spelen")
+    for rij, k in zip(b["Simu"][1:], ["Q 1, R 1", "I 1", "", "R 2/Q 2", "x"]):
+        rij.append(k)
+    return b
+
+
 SCENARIOS = {
+    "concept_keuken_en_kan_spelen": concept_keuken_en_kan_spelen,
+    "toetsdag_keuken": toetsdag_keuken,
     "concept_vast_na_elke_toets": concept_vaste_simus("Na elke toets"),
     "concept_vast_na_elke_pauze": concept_vaste_simus("Na elke pauze"),
     "concept": mv.concept_bladen,

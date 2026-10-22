@@ -33,7 +33,9 @@ De knoppen op het blad *Studenten* verwijzen naar de scripts in je OneDrive. Ver
 |---|---|---|
 | **Studenten** | student | Studentnummer, Voornaam/Roepnaam, Tussenvoegsel, Achternaam, Klas, Niet inroosteren bij SB-docent, Niet inroosteren bij de vaardighedendocent, en optioneel TTV, Voorkeur, Opmerkingen en IsHerkanser |
 | **Toetsdag_Kans1** / **Toetsdag_Her** | lokaal per toetsdag | Datum, Lokaal, Casus, Casus na pauze, Vaardigheid, Beoordelaar, Beoordelaar 2, Wissel om |
-| **Simu** | simucliënt per toetsdag | Datum, simucliënt, Vanaf, Tot, en optioneel Vast lokaal (leeg = wisselt mee, Ja = blijft in één lokaal, of een lokaalnaam) |
+| **Simu** | simucliënt per toetsdag | Datum, simucliënt, Vanaf, Tot, en optioneel Vast lokaal (leeg = wisselt mee, Ja = blijft in één lokaal, of een lokaalnaam) en Kan spelen (bijv. `vrouw` of `P1, P2`; leeg = alles) |
+
+Heeft een casus een speciaal lokaal nodig, bijvoorbeeld een keuken? Zet dan kenmerken tussen haakjes: lokaal `C1.36 (keuken)` en casus `K3 vrouw (keuken)`. De casus gaat dan, met zijn beoordelaar, vanzelf naar een passend lokaal.
 
 De tijden van de dag (eerste toets, laatste toets, toetsduur, wisseltijd en pauzes) staan in het blad **Instellingen**. Ze zijn ingesteld zoals op de echte toetsdag: 15 min toets + 5 min wissel, van 09:40 tot 17:00, met pauzes om 11:15, 13:00 en 15:15.
 

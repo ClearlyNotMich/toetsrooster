@@ -15,7 +15,7 @@ Je vult drie dingen in. Het programma maakt de rest.
    - *Datum*, *Lokaal*, *Casus*;
    - *Casus na pauze* (optioneel), *Vaardigheid*, *Beoordelaar*;
    - *Beoordelaar 2* en *Wissel om* (optioneel), voor een wissel halverwege de dag. Bijvoorbeeld: Youri tot 12:25, daarna Nadine.
-3. **Simu**: één rij per simucliënt per toetsdag: *Datum*, *simucliënt*, en optioneel *Vanaf*, *Tot* en *Vast lokaal*. Een lege datum betekent elke dag. In de app vul je dit blad met **Simu's importeren…** vanuit het overzicht *Beschikbaarheid simu's*.
+3. **Simu**: één rij per simucliënt per toetsdag: *Datum*, *simucliënt*, en optioneel *Vanaf*, *Tot*, *Vast lokaal* en *Kan spelen*. Een lege datum betekent elke dag. In de app vul je dit blad met **Simu's importeren…** vanuit het overzicht *Beschikbaarheid simu's*.
 
 Uit de instellingen (eerste toets, laatste toets, toetsduur, wisseltijd en pauzes) maakt het programma alle slots. Met de standaardwaarden is dat elke 20 minuten een student (15 min toets + 5 min wissel): 09:40–11:15, 11:45–13:00, 14:00–15:15 en 15:45–17:00. Dat zijn 17 slots per lokaal, net als op de echte toetsdag van 14 april.
 
@@ -53,6 +53,36 @@ Zo wordt het gelezen:
 Staat er een conceptblad in de werkmap, dan gaat het voor het blad Toetsdag. Dat staat dan ook als melding bij Meldingen. In de app zet **Concept laden…** het concept uit een ander bestand in de open werkmap. Bij *Excel opslaan* wordt het bewaard als blad *Concept*.
 
 **Oude werkwijze:** is het blad Toetsdag leeg en bestaat *Slots_Kans1* / *Slots_Her* (één rij per begintijd), dan worden de oude bladen gebruikt, samen met *Beoordelaars*. Een *Simu*-blad met een kolom *Tijd* wordt ook nog gelezen als één rij per slot.
+
+## Kenmerken: casus die een bepaald lokaal nodig heeft
+
+Zet kenmerken tussen haakjes achter het lokaal en achter de casus. Dat kan in het blad Toetsdag en in het conceptblad:
+
+- lokaal `C1.36 (keuken)`, `Praktijkhuis (keuken, tillift)`;
+- casus `K3 vrouw (keuken)`.
+
+Zo wordt het verwerkt:
+
+- Een casus die een kenmerk vraagt, gaat met zijn beoordelaar en vaardigheid naar een lokaal dat die kenmerken heeft.
+  - De casus met de minste mogelijke lokalen gaat eerst.
+  - Staat de casus al in een passend lokaal, dan blijft hij daar.
+- De andere casussen vullen de overige lokalen op volgorde.
+- Elke verschuiving staat bij Meldingen. Is er geen passend lokaal vrij, dan volgt een waarschuwing.
+- De kenmerken zelf staan niet in het rooster of de PDF's.
+- Ook *Casus na pauze* kan een kenmerk vragen. Het lokaal ligt dan al vast, dus dat wordt alleen gecontroleerd.
+
+## Kan spelen: welke simu welke casus speelt
+
+Kolom *Kan spelen* in het blad Simu, of in de app via **Simucliënten…**:
+
+- leeg betekent alle casussen;
+- anders een of meer woorden of casusnamen, gescheiden door `,` `;` of `/`, bijvoorbeeld `vrouw` of `P1, P2`. Een woord moet als heel woord in de casusnaam staan: `vrouw` past op *P3 vrouw*, `P1` niet op *P10*.
+
+Zo wordt het verwerkt:
+
+- Simu's wisselen alleen naar lokalen met een casus die ze kunnen spelen.
+- Een waarschuwing volgt als niemand van die dag een casus kan spelen.
+- Een waarschuwing volgt ook als een vaste simu de casus van zijn lokaal niet kan spelen.
 
 ## Uitvoer
 

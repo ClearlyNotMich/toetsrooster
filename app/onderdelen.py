@@ -385,21 +385,23 @@ class SimuVast(QDialog):
     def __init__(self, simu: list, lokalen: list, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Simucliënten")
-        self.setMinimumSize(640, 520)
+        self.setMinimumSize(820, 540)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(24, 20, 24, 20)
         lay.setSpacing(12)
         lay.addWidget(label("Simucliënten", "legenda"))
         lay.addWidget(label("Standaard wisselen simu's van lokaal volgens de instelling ‘Simu's wisselen van lokaal’, "
                             "zodat ze niet steeds dezelfde casus spelen. Wil iemand liever op één plek blijven, kies dan "
-                            "‘Vast (eigen lokaal)’ of een lokaal. Dit komt in de kolom ‘Vast lokaal’ van het blad Simu.",
+                            "‘Vast (eigen lokaal)’ of een lokaal. Bij ‘Kan spelen’ zet je welke casussen iemand kan spelen, "
+                            "bijv. ‘vrouw’ of ‘P1, P2’ (leeg = alles). Dit komt in het blad Simu.",
                             "gedempt", wrap=True))
         kop = simu[0]
         kd, kn = rc.kolom(kop, "datum"), rc.kolom(kop, "simuclint", "simu", "simulant", "naam")
         kv, kt, kl = rc.kolom(kop, "vanaf", "van"), rc.kolom(kop, "tot"), rc.kolom(kop, "vastlokaal")
+        kk = rc.kolom(kop, "kanspelen")
         self.rijen = [i for i, r in enumerate(simu) if i and rc.tekst(rc.cel(r, kn))]
-        self.tabel = QTableWidget(len(self.rijen), 4)
-        self.tabel.setHorizontalHeaderLabels(["Datum", "Simucliënt", "Tijd", "Lokaal"])
+        self.tabel = QTableWidget(len(self.rijen), 5)
+        self.tabel.setHorizontalHeaderLabels(["Datum", "Simucliënt", "Tijd", "Lokaal", "Kan spelen"])
         self.tabel.verticalHeader().setVisible(False)
         self.tabel.verticalHeader().setDefaultSectionSize(40)
         self.tabel.setShowGrid(False)
@@ -407,7 +409,7 @@ class SimuVast(QDialog):
         self.tabel.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.tabel.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.tabel.horizontalHeader().setStretchLastSection(True)
-        self.keuzes = []
+        self.keuzes, self.kan = [], []
         for r, i in enumerate(self.rijen):
             rij = simu[i]
             d = rc.naar_datum(rc.cel(rij, kd)) if rc.tekst(rc.cel(rij, kd)) else None
@@ -428,6 +430,9 @@ class SimuVast(QDialog):
                 keuze.setCurrentText(nu)
             self.tabel.setCellWidget(r, 3, keuze)
             self.keuzes.append(keuze)
+            kan = QLineEdit(rc.tekst(rc.cel(rij, kk)), placeholderText="alles")
+            self.tabel.setCellWidget(r, 4, kan)
+            self.kan.append(kan)
         lay.addWidget(self.tabel, 1)
         knoppen = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         knoppen.button(QDialogButtonBox.Ok).setText("Opslaan in blad Simu")
@@ -438,6 +443,6 @@ class SimuVast(QDialog):
         lay.addWidget(knoppen)
 
     def waarden(self) -> dict:
-        """Rijnummer in het blad Simu -> waarde voor 'Vast lokaal' ('' = wisselt, 'Ja' = vast, of een lokaal)."""
-        return {i: "" if k.currentText() == WISSELT else "Ja" if k.currentText() == VAST_AUTO else k.currentText()
-                for i, k in zip(self.rijen, self.keuzes)}
+        """Rijnummer in het blad Simu -> (Vast lokaal: '' = wisselt, 'Ja' = vast, of een lokaal; Kan spelen)."""
+        return {i: ("" if k.currentText() == WISSELT else "Ja" if k.currentText() == VAST_AUTO else k.currentText(),
+                    kan.text().strip()) for i, k, kan in zip(self.rijen, self.keuzes, self.kan)}

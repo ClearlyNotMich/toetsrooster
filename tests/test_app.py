@@ -202,6 +202,7 @@ def test_simus_vast_lokaal_in_app(tmp_path):
         assert dlg.keuzes[0].findText("C2") >= 0
         dlg.keuzes[0].setCurrentText("C2")
         dlg.keuzes[1].setCurrentText("Vast (eigen lokaal)")
+        dlg.kan[2].setText("vrouw")
         return True
     assert v.simus_instellen(kies)
     r = v.maak()
@@ -209,7 +210,8 @@ def test_simus_vast_lokaal_in_app(tmp_path):
     assert {rij[2] for rij in rooster[1:] if rij[6] == "Siem"} == {"C2"} and {rij[2] for rij in rooster[1:] if rij[6] == "Tom"} == {"A1"}
     assert len({rij[6] for rij in rooster[1:] if rij[2] == "B1"}) > 1
     uit = rc.lees_werkmap(v.opslaan(str(tmp_path / "uit.xlsx")))["Simu"]
-    assert uit[0][4] == "Vast lokaal" and [r_[4] for r_ in uit[1:3]] == ["C2", "Ja"]
+    assert uit[0][4:6] == ["Vast lokaal", "Kan spelen"] and [r_[4] for r_ in uit[1:3]] == ["C2", "Ja"] and uit[3][5] == "vrouw"
+    assert all("vrouw" in rij[3] for rij in rooster[1:] if rij[6] == "Uma")
     # importeren daarna houdt 'Vast lokaal' per naam vast
     nieuw = uitvoer.simu_blad_met(uit, 46371, [{"naam": "Siem", "van": None, "tot": None}, {"naam": "Nieuw", "van": None, "tot": None}])
-    assert [r_[4] for r_ in nieuw[1:]] == ["C2", ""]
+    assert [r_[4:6] for r_ in nieuw[1:]] == [["C2", ""], ["", ""]]

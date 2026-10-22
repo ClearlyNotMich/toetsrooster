@@ -442,8 +442,62 @@ def heeft_data(matrix: list | None) -> bool:
     return bool(matrix) and any(not leeg(r) for r in matrix[1:])
 
 
-def lees_toetsdag(matrix: list, blad: str, s: dict, fouten: list) -> tuple[list, dict]:
-    """Blad Toetsdag (één rij per lokaal per dag) -> slots en beschikbare beoordelaars per slot."""
+def kenmerken(v) -> tuple:
+    """'C1.36 (keuken)' -> ('C1.36', ['keuken']); 'K3 vrouw (keuken, rolstoel)' -> ('K3 vrouw', ['keuken', 'rolstoel'])."""
+    t = tekst(v)
+    tags = [x.strip() for m in re.findall(r"\(([^)]*)\)", t) for x in re.split(r"[,;/]", m) if x.strip()]
+    return re.sub(r"\s*\([^)]*\)", "", t).strip(), tags
+
+
+def past_bij(eisen: list, tags: list) -> bool:
+    return all(norm(e) in [norm(x) for x in tags] for e in eisen)
+
+
+def heel_woord(t: str, woord: str) -> bool:
+    return re.search(r"(^|[^a-z0-9])" + re.escape(woord.lower().strip()) + r"($|[^a-z0-9])", t.lower()) is not None
+
+
+def speelt(kan: list, casus: str) -> bool:
+    """Kan een simu met 'Kan spelen' = kan (bijv. ['vrouw'] of ['P1', 'P2']) deze casus spelen? Leeg = alles."""
+    return not kan or any(norm(k) == norm(casus) or heel_woord(casus, k) for k in kan)
+
+
+def koppel_lokalen(lokalen: list, eisen: list) -> list:
+    """Welk lokaal krijgt eenheid k (casus + beoordelaar)? Eenheden met eisen ('keuken') eerst, de meest beperkte
+    voorop, bij voorkeur in hun eigen lokaal; daarna de rest op volgorde. Geeft per k een lokaalindex (of None)."""
+    n = len(lokalen)
+    uit = [None] * len(eisen)
+    bezet: list = []
+    opties = lambda k: [j for j in ([k] if k < n else []) + list(range(n)) if j not in bezet]  # noqa: E731
+    met_eis = sorted([k for k in range(len(eisen)) if eisen[k]],
+                     key=lambda k: (sum(1 for j in range(n) if past_bij(eisen[k], lokalen[j][1])), k))
+    for k in met_eis:
+        j = next((j for j in opties(k) if past_bij(eisen[k], lokalen[j][1])), None)
+        if j is not None:
+            uit[k] = j
+            bezet.append(j)
+    for k in range(len(eisen)):
+        if uit[k] is None and opties(k):
+            uit[k] = opties(k)[0]
+            bezet.append(uit[k])
+    return uit
+
+
+def meld_koppeling(lokalen: list, casussen: list, eisen: list, uit: list, d, meldingen: list) -> None:
+    for k, j in enumerate(uit):
+        if j is None:
+            continue
+        if eisen[k] and not past_bij(eisen[k], lokalen[j][1]):
+            meldingen.append(("Waarschuwing", f"Casus {casussen[k]} vraagt {', '.join(eisen[k])}, maar op {datum_tekst(d)} "
+                              f"is daar geen vrij lokaal voor; staat nu in {lokalen[j][0]}."))
+        elif j != k and k < len(lokalen):
+            meldingen.append(("Info", f"Casus {casussen[k]} staat in lokaal {lokalen[j][0]} "
+                              f"({', '.join(eisen[k]) or 'ruil'}) in plaats van {lokalen[k][0]}."))
+
+
+def lees_toetsdag(matrix: list, blad: str, s: dict, fouten: list, meldingen: list) -> tuple[list, dict]:
+    """Blad Toetsdag (één rij per lokaal per dag) -> slots en beschikbare beoordelaars per slot.
+    Kenmerken tussen haakjes: 'C1.36 (keuken)' en casus 'K3 (keuken)' -> die casus (met beoordelaar) gaat naar dat lokaal."""
     kop = list(matrix[0])
     kd, kl, kb = kolom(kop, "datum"), kolom(kop, "lokaal"), kolom(kop, "beoordelaar")
     kc, kn, kv = kolom(kop, "casus"), kolom(kop, "casusnapauze"), kolom(kop, "vaardigheid")
@@ -451,14 +505,13 @@ def lees_toetsdag(matrix: list, blad: str, s: dict, fouten: list) -> tuple[list,
     if min(kd, kl, kb) < 0:
         fouten.append(f"Blad '{blad}': kolommen 'Datum', 'Lokaal' en 'Beoordelaar' zijn verplicht.")
         return [], {}
-    slots, beo, gezien = [], {}, []
-    tijden = tijdgrid(s)
+    eenheden, gezien = [], []
     for i, rij in enumerate(matrix[1:], start=1):
         if leeg(rij):
             continue
-        d, lokaal, naam = naar_datum(cel(rij, kd)), tekst(cel(rij, kl)), tekst(cel(rij, kb))
+        d, lokaal, naam = naar_datum(cel(rij, kd)), kenmerken(cel(rij, kl)), tekst(cel(rij, kb))
         naam2, w = tekst(cel(rij, kb2)), naar_minuten(cel(rij, kw)) if tekst(cel(rij, kw)) else None
-        if d is None or not lokaal or not naam:
+        if d is None or not lokaal[0] or not naam:
             fouten.append(f"Blad '{blad}' rij {i + 1}: vul een geldige datum ({DATUM_VOORBEELD}; nu "
                           f"'{tekst(cel(rij, kd))}'), een lokaal en een beoordelaar in.")
             continue
@@ -466,14 +519,30 @@ def lees_toetsdag(matrix: list, blad: str, s: dict, fouten: list) -> tuple[list,
             fouten.append(f"Blad '{blad}' rij {i + 1}: vul 'Beoordelaar 2' en 'Wissel om' (een tijd) allebei in, "
                           "of laat beide leeg.")
             continue
-        if f"{d}_{norm(lokaal)}" in gezien:
-            fouten.append(f"Blad '{blad}' rij {i + 1}: lokaal {lokaal} staat al eerder op {datum_tekst(d)}.")
+        if f"{d}_{norm(lokaal[0])}" in gezien:
+            fouten.append(f"Blad '{blad}' rij {i + 1}: lokaal {lokaal[0]} staat al eerder op {datum_tekst(d)}.")
             continue
-        gezien.append(f"{d}_{norm(lokaal)}")
-        for t in tijden:
-            slots.append({"n": len(slots), "d": d, "t": t, "lokaal": lokaal, "casus": tekst(cel(rij, kc)),
-                          "casus_na": tekst(cel(rij, kn)), "vaardigheid": tekst(cel(rij, kv))})
-            beo[f"{d}_{t}_{norm(lokaal)}"] = [{"naam": naam2 if naam2 and t >= w else naam, "casus": "", "lokaal": ""}]
+        gezien.append(f"{d}_{norm(lokaal[0])}")
+        eenheden.append({"d": d, "lokaal": lokaal, "casus": kenmerken(cel(rij, kc)), "casus_na": kenmerken(cel(rij, kn)),
+                         "vaardigheid": tekst(cel(rij, kv)), "naam": naam, "naam2": naam2, "w": w})
+    slots, beo = [], {}
+    tijden = tijdgrid(s)
+    for d in list(dict.fromkeys(e["d"] for e in eenheden)):
+        rijen = [e for e in eenheden if e["d"] == d]
+        lokalen = [e["lokaal"] for e in rijen]
+        eisen = [e["casus"][1] for e in rijen]
+        plek = koppel_lokalen(lokalen, eisen)
+        meld_koppeling(lokalen, [e["casus"][0] for e in rijen], eisen, plek, d, meldingen)
+        for k, e in enumerate(rijen):
+            kamer = lokalen[plek[k]]
+            if e["casus_na"][1] and not past_bij(e["casus_na"][1], kamer[1]):
+                meldingen.append(("Waarschuwing", f"Casus na pauze {e['casus_na'][0]} vraagt {', '.join(e['casus_na'][1])}, "
+                                  f"maar lokaal {kamer[0]} heeft dat niet."))
+            for t in tijden:
+                slots.append({"n": len(slots), "d": d, "t": t, "lokaal": kamer[0], "casus": e["casus"][0],
+                              "casus_na": e["casus_na"][0], "vaardigheid": e["vaardigheid"]})
+                beo[f"{d}_{t}_{norm(kamer[0])}"] = [{"naam": e["naam2"] if e["naam2"] and t >= e["w"] else e["naam"],
+                                                    "casus": "", "lokaal": ""}]
     return slots, beo
 
 
@@ -483,7 +552,7 @@ def lees_simu_dag(matrix: list, blad: str, fouten: list, meldingen: list) -> lis
     kop = list(matrix[0])
     kn, kd = kolom(kop, "simuclint", "simu", "simulant", "naam"), kolom(kop, "datum")
     kv, kt = kolom(kop, "vanaf", "van"), kolom(kop, "tot")
-    kl = kolom(kop, "vastlokaal")
+    kl, kk = kolom(kop, "vastlokaal"), kolom(kop, "kanspelen")
     if kn < 0:
         fouten.append(f"Blad '{blad}': kolom 'simucliënt' ontbreekt.")
         return []
@@ -505,7 +574,7 @@ def lees_simu_dag(matrix: list, blad: str, fouten: list, meldingen: list) -> lis
                               f"{datum_tekst(d) if d is not None else 'elke dag'}; telt maar één keer."))
             continue
         vast = tekst(cel(rij, kl))
-        lijst.append({"naam": naam, "d": d, "van": van, "tot": tot,
+        lijst.append({"naam": naam, "d": d, "van": van, "tot": tot, "kan": namen_lijst(cel(rij, kk)),
                       "vast": "" if norm(vast) in ("", "nee", "n", "wisselt") else "ja" if waar(vast) else vast})
     return lijst
 
@@ -582,14 +651,28 @@ def simu_rotatie(slots: list, simus: list, s: dict, meldingen: list) -> dict:
         plek = kamers_rot.index(lokaal) if lokaal in kamers_rot else kamers[slot["d"]].index(lokaal)
         k = (plek + stap(slot["d"], slot["t"])) % len(wissel) if wissel else 0
         lijst = [{"naam": x["naam"], "casus": "", "lokaal": ""} for x in eigen + wissel[k:] + wissel[:k]
-                 if kan(x, slot["t"], slot["t"] + s["duur"])]
+                 if kan(x, slot["t"], slot["t"] + s["duur"]) and speelt(x["kan"], slot["casus"])]
         if lijst:
             uit[f"{slot['d']}_{slot['t']}_{norm(slot['lokaal'])}"] = lijst
         else:
             zonder += 1
     if zonder and any(gekozen.values()):
-        meldingen.append(("Info", f"{zonder} slot(s) zonder beschikbare simucliënt (bijv. vóór 'Vanaf' of na 'Tot' in "
-                          "het blad Simu); daar wordt niemand ingeroosterd."))
+        meldingen.append(("Info", f"{zonder} slot(s) zonder beschikbare simucliënt (vóór 'Vanaf', na 'Tot', of niemand die "
+                          "die casus kan spelen); daar wordt niemand ingeroosterd."))
+    gemeld = []
+    for slot in slots:  # casus die niemand van die dag kan spelen, en vaste simu's die hun casus niet kunnen spelen
+        die_dag = [x for x in simus if x["d"] is None or x["d"] == slot["d"]]
+        sleutel = f"{slot['d']}_{slot['casus']}"
+        if die_dag and sleutel not in gemeld and not any(speelt(x["kan"], slot["casus"]) for x in die_dag):
+            gemeld.append(sleutel)
+            meldingen.append(("Waarschuwing", f"Casus {slot['casus']} op {datum_tekst(slot['d'])}: geen simucliënt die "
+                              "deze casus kan spelen (kolom 'Kan spelen' in het blad Simu)."))
+        h = thuis[slot["d"]].get(norm(slot["lokaal"]))
+        sleutel = f"{slot['d']}_{h['naam'] if h else ''}_{slot['casus']}"
+        if h and not speelt(h["kan"], slot["casus"]) and sleutel not in gemeld:
+            gemeld.append(sleutel)
+            meldingen.append(("Waarschuwing", f"{h['naam']} staat vast in {slot['lokaal']}, maar kan casus {slot['casus']} "
+                              "niet spelen; daar spelen dan de anderen."))
     return uit
 
 
@@ -678,9 +761,12 @@ def lees_concept(matrix: list, blad: str, s: dict, fouten: list, meldingen: list
     starts = sorted(starts) or tijdgrid(s)
     if starts:
         s["start"], s["eind"] = starts[0], max(starts) + s["duur"]
-    lokalen = [tekst(v) for v in waarden.get("lokalen", [])]
+    kamers = [kenmerken(v) for v in waarden.get("lokalen", [])]
+    lokalen = [x[0] for x in kamers]
     lijst = lambda naam: [tekst(v) for v in waarden.get(naam, [])]  # noqa: E731
-    casus, casus_na, vaardigheid = lijst("casus"), lijst("casus_na"), lijst("vaardigheid")
+    casus_k = [kenmerken(v) for v in waarden.get("casus", [])]
+    casus_na_k = [kenmerken(v) for v in waarden.get("casus_na", [])]
+    casus, casus_na, vaardigheid = [x[0] for x in casus_k], [x[0] for x in casus_na_k], lijst("vaardigheid")
     if len(casus) != len(lokalen):
         meldingen.append(("Waarschuwing", f"Blad '{blad}': {len(lokalen)} lokalen maar {len(casus)} casussen; "
                           "ze worden op volgorde gekoppeld."))
@@ -700,8 +786,17 @@ def lees_concept(matrix: list, blad: str, s: dict, fouten: list, meldingen: list
         per_lokaal.append([p])
     for p in [q for k in per_lokaal[len(lokalen):] for q in k] + reserve:
         meldingen.append(("Info", f"Niet ingedeeld (reserve): {p['tekst']}."))
+    # Casus k (met beoordelaar en vaardigheid) naar een lokaal dat de gevraagde kenmerken heeft, bijv. (keuken).
+    eisen = [casus_k[k][1] if k < len(casus_k) else [] for k in range(len(lokalen))]
+    plek = koppel_lokalen(kamers, eisen)
+    if d is not None:
+        meld_koppeling(kamers, [casus[k] if k < len(casus) else "" for k in range(len(lokalen))], eisen, plek, d, meldingen)
     indeling = []
-    for k, lokaal in enumerate(lokalen):
+    for k in range(len(lokalen)):
+        lokaal = lokalen[plek[k]]
+        if k < len(casus_na_k) and casus_na_k[k][1] and not past_bij(casus_na_k[k][1], kamers[plek[k]][1]):
+            meldingen.append(("Waarschuwing", f"Casus na pauze {casus_na[k]} vraagt {', '.join(casus_na_k[k][1])}, "
+                              f"maar lokaal {lokaal} heeft dat niet."))
         wie = per_lokaal[k] if k < len(per_lokaal) else []
         indeling.append(f"{lokaal} {' → '.join(wie_tekst(p) for p in wie) or '(geen beoordelaar)'}")
         if not wie:
@@ -779,7 +874,7 @@ def maak_rooster(bladen: dict, modus: str) -> dict:
         fouten.append(f"Blad '{s[m['dag']]}' ontbreekt of is leeg.")
         slots, beoordelaars = [], {}
     elif dagmodus:
-        slots, beoordelaars = lees_toetsdag(dag, s[m["dag"]], s, fouten)
+        slots, beoordelaars = lees_toetsdag(dag, s[m["dag"]], s, fouten, meldingen)
     else:
         slots = lees_slots(bladen.get(s[m["slots"]]), s[m["slots"]], fouten)
         beoordelaars = lees_beschikbaar(bladen.get(s["blad_beo"]), s["blad_beo"], ("beoordelaar", "naam"), fouten)

@@ -105,7 +105,7 @@ def maak_sjabloon(pad: str) -> None:
         s["blad_studenten"]: [STUDENTEN_KOP],
         s["blad_dag1"]: [dag],
         s["blad_dag_her"]: [dag],
-        s["blad_simu"]: [["Datum", "simucliënt", "Vanaf", "Tot", "Vast lokaal"]],
+        s["blad_simu"]: [["Datum", "simucliënt", "Vanaf", "Tot", "Vast lokaal", "Kan spelen"]],
         rc.INSTELLINGEN_BLAD: rc.instellingen_matrix(),
     })
     wb.save(pad)
@@ -189,32 +189,36 @@ def lees_beschikbaarheid(pad: str, middag: int = 12 * 60) -> list:
 
 def simu_blad_met(oud: list | None, datum: int, gekozen: list) -> list:
     """Blad Simu (dagvorm) met de rijen voor `datum` vervangen door `gekozen` ({naam, van, tot}).
-    Een al ingevuld 'Vast lokaal' blijft per simu bewaard. Een oud blad met kolom Tijd wordt vervangen."""
-    kop = ["Datum", "simucliënt", "Vanaf", "Tot", "Vast lokaal"]
+    Al ingevulde 'Vast lokaal' en 'Kan spelen' blijven per simu bewaard. Een oud blad met kolom Tijd wordt vervangen."""
+    kop = ["Datum", "simucliënt", "Vanaf", "Tot", "Vast lokaal", "Kan spelen"]
     rijen, vast = [], {}
     if oud and rc.kolom(oud[0], "tijd") < 0:
         k = [rc.kolom(oud[0], "datum"), rc.kolom(oud[0], "simuclint", "simu", "simulant", "naam"),
-             rc.kolom(oud[0], "vanaf", "van"), rc.kolom(oud[0], "tot"), rc.kolom(oud[0], "vastlokaal")]
+             rc.kolom(oud[0], "vanaf", "van"), rc.kolom(oud[0], "tot"), rc.kolom(oud[0], "vastlokaal"),
+             rc.kolom(oud[0], "kanspelen")]
         for r in oud[1:]:
             if rc.leeg(r):
                 continue
             if rc.naar_datum(rc.cel(r, k[0])) == datum:
-                vast[rc.norm(rc.cel(r, k[1]))] = rc.cel(r, k[4])
+                vast[rc.norm(rc.cel(r, k[1]))] = [rc.cel(r, k[4]), rc.cel(r, k[5])]
             else:
                 rijen.append([rc.cel(r, i) for i in k])
     tijd = lambda m: "" if m is None else m / 1440  # noqa: E731
-    return [kop] + rijen + [[datum, s["naam"], tijd(s["van"]), tijd(s["tot"]), vast.get(rc.norm(s["naam"]), "")]
+    return [kop] + rijen + [[datum, s["naam"], tijd(s["van"]), tijd(s["tot"])] + vast.get(rc.norm(s["naam"]), ["", ""])
                             for s in gekozen]
 
 
-def simu_vast_bijwerken(oud: list, vast: dict) -> list:
-    """Blad Simu (dagvorm) met kolom 'Vast lokaal' gezet per rijnummer {rij: waarde}."""
+def simu_vast_bijwerken(oud: list, waarden: dict) -> list:
+    """Blad Simu (dagvorm) met per rijnummer {rij: (vast lokaal, kan spelen)} ingevuld; kolommen worden zo nodig toegevoegd."""
     kop = list(oud[0])
-    c = rc.kolom(kop, "vastlokaal")
-    if c < 0:
-        c = len(kop)
-        kop.append("Vast lokaal")
+    cols = []
+    for naam, titel in (("vastlokaal", "Vast lokaal"), ("kanspelen", "Kan spelen")):
+        c = rc.kolom(kop, naam)
+        if c < 0:
+            c = len(kop)
+            kop.append(titel)
+        cols.append(c)
     nieuw = [kop] + [list(r) + [""] * (len(kop) - len(r)) for r in oud[1:]]
-    for i, w in vast.items():
-        nieuw[i][c] = w
+    for i, w in waarden.items():
+        nieuw[i][cols[0]], nieuw[i][cols[1]] = w
     return nieuw

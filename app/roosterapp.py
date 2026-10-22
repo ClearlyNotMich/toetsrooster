@@ -42,7 +42,9 @@ HULP = """
   <li><b>Simu</b> — één rij per simucliënt per toetsdag, eventueel met <i>Vanaf</i>/<i>Tot</i>.
       Sneller: <i>Simu's importeren…</i> in de zijbalk neemt ze over uit het overzicht ‘Beschikbaarheid simu's’.
       Met <i>Simucliënten…</i> kies je per simu of hij van lokaal wisselt (standaard) of vast in één lokaal blijft
-      (kolom <i>Vast lokaal</i>).</li>
+      (kolom <i>Vast lokaal</i>), en welke casussen hij kan spelen (<i>Kan spelen</i>, bijv. ‘vrouw’).</li>
+  <li><b>Speciaal lokaal nodig</b>, zoals een keuken? Zet kenmerken tussen haakjes: lokaal ‘C1.36 (keuken)’ en casus
+      ‘K3 vrouw (keuken)’. De casus gaat dan met zijn beoordelaar naar een passend lokaal.</li>
   </ul></li>
 <li><b>Open de werkmap</b> hier (download hem eerst uit OneDrive/SharePoint).</li>
 <li>Controleer de <b>instellingen</b>: eerste en laatste toets, toetsduur, wisseltijd en pauzes. Daaruit worden alle
@@ -579,7 +581,7 @@ class Venster(QMainWindow):
             return False
         self.bladen[blad] = self.ingevoerd[blad] = uitvoer.simu_vast_bijwerken(simu, dlg.waarden())
         self.verouderd()
-        vast = sum(1 for w in dlg.waarden().values() if w)
+        vast = sum(1 for w in dlg.waarden().values() if w[0])
         self.statusBar().showMessage(f"{vast} simucliënt(en) vast, de rest wisselt mee. Maak het rooster opnieuw; "
                                      "‘Excel opslaan’ bewaart het blad Simu.")
         return True
