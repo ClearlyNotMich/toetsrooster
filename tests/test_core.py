@@ -51,7 +51,7 @@ def test_casus_wisselt_na_pauze():
 
 def test_jaar2_duur_instelbaar():
     def jaar2(b):
-        b["Instellingen"] = rc.instellingen_matrix({"Jaar": 2, "Toetsduur jaar 2 (min)": 20, "TTV-toetsduur jaar 2 (min)": 40})
+        b["Instellingen"] = rc.instellingen_matrix({"jaar": 2, "duur2": 20, "ttv2": 40})
     r, _ = plan(wijzig=jaar2)
     duren = {round((x["Eindtijd"] - x["Tijd"]) * 1440) for x in rijen(r, "Rooster_Kans1")}
     assert duren == {20, 40}
@@ -140,3 +140,83 @@ def test_ontbrekende_instellingen_worden_aangemaakt():
 def test_tijden_als_tekst():
     assert rc.naar_minuten("9:05") == 545 and rc.naar_minuten(0.375) == 540 and rc.naar_datum("16-04-2026") == 46128
     assert rc.naar_minuten("25:00") is None and rc.naar_datum("31-02-2026") is None
+
+
+# ---------------------------------------------------------------- instellingen
+
+def met(**w):
+    def wijzig(b):
+        b["Instellingen"] = rc.instellingen_matrix({**rc.instellingen_waarden(b["Instellingen"]), **w})
+    return wijzig
+
+
+def test_schema_compleet_en_uniek():
+    sleutels = [i["sleutel"] for i in rc.INSTELLINGEN]
+    assert len(set(sleutels)) == len(sleutels) and len({rc.norm(i["label"]) for i in rc.INSTELLINGEN}) == len(sleutels)
+    assert all(i["groep"] in rc.GROEPEN for i in rc.INSTELLINGEN)
+    assert all(i["standaard"] in i["opties"] for i in rc.INSTELLINGEN if i["soort"] == "keuze")
+
+
+def test_ttv_zo_vroeg_mogelijk():
+    r, _ = plan(wijzig=met(ttv_plek="Zo vroeg mogelijk"))
+    ttv = [x for x in rijen(r, "Rooster_Kans1") if x["bijzheden"].startswith("TTV")]
+    assert {rc.tijd_tekst(round(x["Tijd"] * 1440)) for x in ttv} == {"10:20"}
+
+
+def test_casus_na_pauze_uit():
+    r, _ = plan(wijzig=met(casus_na="Nee"))
+    assert {x["Casus"] for x in rijen(r, "Rooster_Kans1")} == {"XY", "MM"}
+
+
+def test_namen_deels_vergelijken():
+    assert rc.beperkt("Ann", ["An"], True) and not rc.beperkt("Ann", ["An"], False) and rc.beperkt("ann ", ["Ann"], False)
+
+    def alleen_ann(b, deels):
+        b["Beoordelaars"] = [b["Beoordelaars"][0]] + [x for x in b["Beoordelaars"][1:] if x[2] == "Ann"]
+        b["Studenten"][1][5] = "An"  # Anna
+        met(deelnaam=deels)(b)
+    for deels, verwacht in (("Ja", "NIET INGEROOSTERD"), ("Nee", "")):
+        r, _ = plan(wijzig=lambda b: alleen_ann(b, deels))
+        assert next(x for x in rijen(r, "Rooster_Kans1") if x["Voornaam"] == "Anna")["bijzheden"] == verwacht
+
+
+def test_herkansing_verplicht_andere_beoordelaar():
+    def alleen_ann(b):
+        b["Beoordelaars"] = [b["Beoordelaars"][0]] + [x for x in b["Beoordelaars"][1:] if x[2] == "Ann"]
+        met(her_beo="Verplicht")(b)
+    r, _ = plan("her", alleen_ann)
+    mila = next(x for x in rijen(r, "Rooster_Her") if x["Voornaam"] == "Mila")
+    assert mila["bijzheden"] == "NIET INGEROOSTERD"
+
+
+def test_uitdraai_zonder_datum_en_op_tijd():
+    r, _ = plan(wijzig=met(uitdraai_datum="Nee", uitdraai_sort="Tijd"))
+    tijden = [x[2] for x in r["bladen"]["Uitdraai_Kans1"][1:]]
+    assert tijden == sorted(tijden) and all(len(t) == 5 for t in tijden)
+
+
+def test_rooster_op_tijd_gesorteerd():
+    r, _ = plan(wijzig=met(rooster_sort="Tijd, dan lokaal"))
+    tijden = [x["Tijd"] for x in rijen(r, "Rooster_Kans1")]
+    assert tijden == sorted(tijden)
+
+
+def test_ongeldige_instellingen_geven_fouten():
+    r, _ = plan(wijzig=met(rooster_sort="Willekeurig", jaar=3, blad_meldingen=""))
+    assert len(r["fouten"]) == 3 and set(r["bladen"]) == {"Meldingen"}
+
+
+def test_ontbrekende_instellingsrijen_worden_aangevuld():
+    def oud(b):
+        b["Instellingen"] = b["Instellingen"][:8]
+    r, _ = plan(wijzig=oud)
+    inst = r["bladen"]["Instellingen"]
+    assert inst[:8] == mv.voorbeeld_bladen()["Instellingen"][:8] and len(inst) == len(rc.INSTELLINGEN) + 1
+
+
+def test_andere_bladnamen():
+    def hernoem(b):
+        b["Deelnemers"] = b.pop("Studenten")
+        met(blad_studenten="Deelnemers", blad_rooster1="R1", blad_meldingen="Log")(b)
+    r, _ = plan(wijzig=hernoem)
+    assert {"R1", "Log", "Deelnemers", "Uitdraai_Kans1"} <= set(r["bladen"]) and len(r["bladen"]["R1"]) == 13

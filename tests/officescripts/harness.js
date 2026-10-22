@@ -45,6 +45,7 @@ function maakBlad(naam) {
 }
 
 const werkmap = {
+  getWorksheets: () => Object.keys(bladen).map(maakBlad),
   getWorksheet: (naam) => (naam in bladen ? maakBlad(naam) : undefined),
   addWorksheet: (naam) => { if (naam in bladen) throw new Error("bestaat al"); bladen[naam] = []; return maakBlad(naam); },
 };

@@ -1,8 +1,11 @@
 """Maakt de twee Office Scripts (.txt) uit officescripts/rooster.ts. `--check`: faalt als ze verouderd zijn."""
+import json
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "app"))
+from rooster_core import INSTELLINGEN  # noqa: E402
 DOELEN = {
     "OWB Exam Roster Generator.txt": {"__MODUS__": "kans1", "__MODUS_NAAM__": "EERSTE KANS", "__SLOTS__": "Slots_Kans1",
         "__ROOSTER__": "Rooster_Kans1", "__UITDRAAI__": "Uitdraai_Kans1",
@@ -14,7 +17,9 @@ DOELEN = {
 
 def inhoud(vervang: dict) -> str:
     tekst = (ROOT / "officescripts" / "rooster.ts").read_text(encoding="utf-8")
-    for oud, nieuw in vervang.items():
+    # Instellingen-schema uit Python, één regel per instelling.
+    schema = "[\n" + "".join(f"    {json.dumps(i, ensure_ascii=False)},\n" for i in INSTELLINGEN) + "]"
+    for oud, nieuw in {**vervang, "__INSTELLINGEN__": schema}.items():
         tekst = tekst.replace(oud, nieuw)
     return tekst
 

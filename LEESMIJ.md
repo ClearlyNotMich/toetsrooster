@@ -1,6 +1,8 @@
 # OWB Toetsrooster
 
-Maakt het toetsrooster voor de **eerste kans** en de **herkansing**. Er zijn twee manieren, met precies dezelfde regels (zie [docs/REGELS.md](docs/REGELS.md)):
+Maakt het toetsrooster voor de **eerste kans** en de **herkansing**. Je vult de gegevens in: studenten, tijdslots, beoordelaars en simucliënten. Je krijgt een kant-en-klaar rooster terug, als Excel-werkmap en als PDF om te printen of te publiceren. Er is geen roostermaker meer nodig die het met de hand doet.
+
+Er zijn twee manieren, met precies dezelfde regels (zie [docs/REGELS.md](docs/REGELS.md)):
 
 1. **In Excel Online** met de knoppen op het eerste blad (Office Scripts, geen VBA).
 2. Met het **programma OWB-Toetsrooster**: één bestand, dubbelklikken, niets installeren.
@@ -21,11 +23,15 @@ De knoppen op het blad *Studenten* verwijzen naar de scripts in je OneDrive. Ver
 
 ### Wat er verandert in de werkmap
 
-- **Instellingen** (nieuw blad): dit blad wordt de eerste keer automatisch gemaakt. Je kunt instellen:
-  - studiejaar (1/2);
-  - toetsduur (standaard 10 min = één slot);
-  - TTV-duur (standaard 15 min), per jaar;
-  - pauze van/tot.
+- **Instellingen** (nieuw blad): dit blad wordt de eerste keer automatisch gemaakt. Je kunt onder andere instellen:
+  - studiejaar en toetsduur per jaar (standaard 10 min = één slot; TTV 15 min);
+  - pauze en casus na de pauze;
+  - waar TTV-studenten komen;
+  - herkansingsregels (Voorkeur/Verplicht/Maakt niet uit);
+  - sortering en datum op de uitdraai;
+  - alle bladnamen.
+
+  Zie de tabel in [docs/REGELS.md](docs/REGELS.md#instellingen). De app schrijft zijn instellingen bij *Excel opslaan* naar hetzelfde blad, zodat de knoppen in Excel Online daarna dezelfde regels gebruiken.
 - **Rooster_Kans1 / Rooster_Her**:
   - het volledige rooster voor docenten, gesorteerd op datum → lokaal → tijd;
   - de kolommen *Lokaal*, *Casus* en *Eindtijd*.
@@ -64,18 +70,31 @@ Pak de zip uit. Er hoeft niets anders geïnstalleerd te worden: Python en Qt zit
 
 ### Gebruik
 
-1. **Werkmap openen…**: kies het Excel-bestand. Download het eerst uit OneDrive/SharePoint.
-2. Kies **Eerste kans** of **Herkansing**. Controleer daarna het studiejaar, de toetsduur en de pauze.
-3. **Rooster maken**: bekijk de tabbladen *Volledig rooster*, *Uitdraai studenten* en *Meldingen*.
-4. **Opslaan als Excel…**: dit maakt een **nieuw** bestand met het rooster, de uitdraai en de meldingen.
-   - Het origineel wordt nooit overschreven. Zo blijven de scriptknoppen daarin intact.
-5. **Uitdraai studenten (PDF)…**: dit maakt een A4-lijst met alleen naam, lokaal en tijd, om op te hangen of uit te delen.
+1. Nog geen werkmap? Klik in de zijbalk op **Nieuw sjabloon…**. Je krijgt dan een lege werkmap met de juiste bladen en kolommen om in te vullen.
+2. **Werkmap openen…**: kies het Excel-bestand. Download het eerst uit OneDrive/SharePoint.
+3. Controleer de pagina **Instellingen**. Deze wordt gevuld vanuit het blad Instellingen van de werkmap. *Standaardwaarden* zet alles terug.
+4. Kies op de pagina **Rooster** voor **Eerste kans** of **Herkansing** en klik op **Rooster maken**.
+   - De kaarten tonen hoeveel studenten zijn ingeroosterd, en of er waarschuwingen zijn of studenten zonder plek.
+   - Details staan op het tabblad *Meldingen*.
+5. Exporteer:
+   - **Excel opslaan…**: een **nieuw** bestand met het rooster, de uitdraai, de meldingen en de instellingen. Het origineel wordt nooit overschreven, zodat de scriptknoppen daarin intact blijven.
+   - **PDF voor docenten…**: per lokaal en dag een A4-pagina (liggend) met tijd, student, casus, beoordelaar en simucliënt.
+   - **PDF voor studenten…**: alleen naam, lokaal en tijd, om te publiceren of op te hangen.
+
+De pagina **Hulp** in de app legt dezelfde stappen uit.
 
 ---
 
 ## Voor ontwikkelaars
 
-- De logica staat twee keer: in `app/rooster_core.py` (Python) en in `officescripts/rooster.ts` (Office Script). De tests controleren dat beide exact dezelfde uitvoer geven.
+- Opbouw van de app:
+  - `app/rooster_core.py`: logica en de lijst met instellingen;
+  - `app/uitvoer.py`: Excel, PDF en sjabloon;
+  - `app/thema.py`: kleuren en stijl, naar shadcn/ui *neutral*;
+  - `app/onderdelen.py`: UI-onderdelen, waaronder het instellingenformulier, dat zichzelf opbouwt uit de instellingenlijst;
+  - `app/roosterapp.py`: het venster.
+- Een nieuwe instelling voeg je toe in `INSTELLINGEN` in `rooster_core.py`. Gebruik haar daarna in `maak_rooster`, en in `officescripts/rooster.ts` via `txt("sleutel")`. Formulier, blad Instellingen en scripts volgen dan vanzelf.
+- De logica staat twee keer: in `app/rooster_core.py` (Python) en in `officescripts/rooster.ts` (Office Script). De tests controleren dat beide exact dezelfde uitvoer geven, ook bij afwijkende instellingen.
 - Na een wijziging in `rooster.ts` maak je de twee `.txt`-scripts opnieuw met `python tools/bouw_scripts.py`.
 - Testen:
 

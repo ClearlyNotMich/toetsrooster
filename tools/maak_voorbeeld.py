@@ -50,7 +50,7 @@ def voorbeeld_bladen() -> dict:
     for naam in ("Sanne", "Tom"):
         simu += [[DAG2, t, naam, "", ""] for t in tijden("09:00", "10:30")]
 
-    inst = rc.instellingen_matrix({"Pauze van": 11 * 60 / 1440, "Pauze tot": 11.5 * 60 / 1440})
+    inst = rc.instellingen_matrix({"pauze_van": 11 * 60 / 1440, "pauze_tot": 11.5 * 60 / 1440})
     return {"Studenten": s, "Slots_Kans1": k1, "Slots_Her": her, "Beoordelaars": beo, "Simu": simu,
             "Rooster_Kans1": [rc.ROOSTER_KOP], "Rooster_Her": [rc.ROOSTER_KOP], "Instellingen": inst}
 

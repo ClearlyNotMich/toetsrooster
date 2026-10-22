@@ -68,7 +68,41 @@ def echte_opmaak() -> dict:
     return b
 
 
+def met(**waarden):
+    """Voorbeeld met andere instellingen (sleutel -> waarde)."""
+    def maak():
+        b = mv.voorbeeld_bladen()
+        huidig = rc.instellingen_waarden(b["Instellingen"])
+        b["Instellingen"] = rc.instellingen_matrix({**huidig, **waarden})
+        return b
+    return maak
+
+
+def andere_bladnamen():
+    b = met(blad_studenten="Deelnemers", blad_slots1="Tijden 1", blad_slots_her="Tijden 2", blad_beo="Docenten",
+            blad_simu="Acteurs", blad_rooster1="R1", blad_rooster_her="R2", blad_uitdraai1="U1",
+            blad_uitdraai_her="U2", blad_meldingen="Log")()
+    for oud, nieuw in (("Studenten", "Deelnemers"), ("Slots_Kans1", "Tijden 1"), ("Slots_Her", "Tijden 2"),
+                       ("Beoordelaars", "Docenten"), ("Simu", "Acteurs")):
+        b[nieuw] = b.pop(oud)
+    return b
+
+
+def oude_instellingen():
+    b = mv.voorbeeld_bladen()
+    b["Instellingen"] = b["Instellingen"][:8]  # alleen de rijen van de vorige versie
+    b["Instellingen"][7][1] = ""  # pauze tot leeg -> fout: beide of geen
+    return b
+
+
 SCENARIOS = {
+    "alles_anders": met(jaar=2, duur2=20, ttv2=30, casus_na="Nee", ttv_plek="Zo vroeg mogelijk", ttv_eerst="Nee",
+                        deelnaam="nee", her_beo="Verplicht", her_casus="Maakt niet uit", rooster_sort="Tijd, dan lokaal",
+                        uitdraai_sort="Tijd", uitdraai_datum="Nee"),
+    "uitdraai_lokaal": met(uitdraai_sort="Lokaal, dan tijd", her_casus="Verplicht"),
+    "andere_bladnamen": andere_bladnamen,
+    "oude_instellingen": oude_instellingen,
+    "foute_instelling": met(rooster_sort="Willekeurig", jaar=3),
     "voorbeeld": mv.voorbeeld_bladen,
     "echte_opmaak": echte_opmaak,
     "fout": lambda: {**mv.voorbeeld_bladen(), "Simu": [["Datum", "Tijd"]]},
@@ -88,4 +122,4 @@ def test_zelfde_uitvoer_als_python(gecompileerd, tmp_path, modus, scenario):
     assert set(uit["bladen"]) == set(verwacht)
     for naam in verwacht:
         assert netjes(uit["bladen"][naam]) == netjes(verwacht[naam]), naam
-    assert uit["actief"] == ("Meldingen" if resultaat["fouten"] else rc.MODI[modus]["rooster"])
+    assert uit["actief"] == resultaat["namen"]["meldingen" if resultaat["fouten"] else "rooster"]
