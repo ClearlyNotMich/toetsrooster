@@ -1,6 +1,12 @@
 # OWB Toetsrooster
 
-Maakt het toetsrooster voor de **eerste kans** en de **herkansing**. Je vult de gegevens in: studenten, tijdslots, beoordelaars en simucliënten. Je krijgt een kant-en-klaar rooster terug, als Excel-werkmap en als PDF om te printen of te publiceren. Er is geen roostermaker meer nodig die het met de hand doet.
+Maakt het toetsrooster voor de **eerste kans** en de **herkansing**. Je vult drie dingen in:
+
+- de **studentenlijst**;
+- per toetsdag de **lokalen**, elk met een beoordelaar, casus en vaardigheid (blad *Toetsdag*);
+- de **simucliënten**.
+
+Alle tijdslots, de wisseling van simu's per blok en de vrije plekken worden berekend. Je krijgt een kant-en-klaar rooster terug, als Excel-werkmap en als PDF om te printen of te publiceren. Er is geen roostermaker meer nodig die het met de hand doet.
 
 Er zijn twee manieren, met precies dezelfde regels (zie [docs/REGELS.md](docs/REGELS.md)):
 
@@ -21,11 +27,27 @@ De knoppen op het blad *Studenten* verwijzen naar de scripts in je OneDrive. Ver
    - Koppel het daarna via **⋯ → Knop toevoegen** aan een knop.
 5. Klik op de knop **Run OWB Exam Roster Generator**.
 
+### Wat je invult
+
+| Blad | Eén rij per | Kolommen |
+|---|---|---|
+| **Studenten** | student | Studentnummer, Voornaam/Roepnaam, Tussenvoegsel, Achternaam, Klas, Niet inroosteren bij SB-docent, Niet inroosteren bij de vaardighedendocent, en optioneel TTV, Voorkeur, Opmerkingen en IsHerkanser |
+| **Toetsdag_Kans1** / **Toetsdag_Her** | lokaal per toetsdag | Datum, Lokaal, Casus, Casus na pauze, Vaardigheid, Beoordelaar, Beoordelaar 2, Wissel om |
+| **Simu** | simucliënt per toetsdag | Datum, simucliënt, Vanaf, Tot |
+
+De tijden van de dag (eerste toets, laatste toets, toetsduur, wisseltijd en pauzes) staan in het blad **Instellingen**. Ze zijn ingesteld zoals op de echte toetsdag: 15 min toets + 5 min wissel, van 09:40 tot 17:00, met pauzes om 11:15, 13:00 en 15:15.
+
+De volledige regels staan in [docs/REGELS.md](docs/REGELS.md). Werkmappen met de oude bladen *Slots_Kans1*, *Slots_Her* en *Beoordelaars* (één rij per begintijd) werken ook nog, zolang het blad Toetsdag leeg is.
+
 ### Wat er verandert in de werkmap
 
 - **Instellingen** (nieuw blad): dit blad wordt de eerste keer automatisch gemaakt. Je kunt onder andere instellen:
-  - studiejaar en toetsduur per jaar (standaard 10 min = één slot; TTV 15 min);
-  - pauze en casus na de pauze;
+  - begin en eind van de dag, wisseltijd en studiejaar;
+  - toetsduur per jaar: standaard 15 min, TTV 20 min. Dit was eerst 10/15; het is aangepast aan het echte rooster;
+  - pauzes en wanneer de casus wisselt;
+  - of simu's per blok rouleren;
+  - vrije plekken tonen;
+  - de grens tussen ochtend en middag voor voorkeuren;
   - waar TTV-studenten komen;
   - herkansingsregels (Voorkeur/Verplicht/Maakt niet uit);
   - sortering en datum op de uitdraai;
@@ -33,21 +55,22 @@ De knoppen op het blad *Studenten* verwijzen naar de scripts in je OneDrive. Ver
 
   Zie de tabel in [docs/REGELS.md](docs/REGELS.md#instellingen). De app schrijft zijn instellingen bij *Excel opslaan* naar hetzelfde blad, zodat de knoppen in Excel Online daarna dezelfde regels gebruiken.
 - **Rooster_Kans1 / Rooster_Her**:
-  - het volledige rooster voor docenten, gesorteerd op datum → lokaal → tijd;
-  - de kolommen *Lokaal*, *Casus* en *Eindtijd*.
+  - het volledige rooster voor de organisatie, gesorteerd op datum → lokaal → tijd;
+  - de kolommen *Lokaal*, *Casus* en *Eindtijd*;
+  - lege plekken als **Vrije plek**. Je hoeft die rijen niet meer handmatig weg te laten: ze staan nooit op de uitdraai of in de PDF's.
 - **Uitdraai_Kans1 / Uitdraai_Her** (nieuw): voor studenten, met **alleen naam, lokaal en tijd**. Er staat geen studentnummer, casus, beoordelaar of simucliënt op.
 - **Meldingen** (nieuw): hier staat hoeveel studenten zijn ingeroosterd. Ook waarschuwingen staan hier, zoals:
   - studenten die niet passen;
   - een herkanser die toch dezelfde beoordelaar heeft;
-  - fouten in de invoer.
+  - fouten in de invoer;
+  - elke tekst uit *Opmerkingen*, met hoe die is gelezen (bijvoorbeeld 'ttv bij uitvoering' → TTV, 'graag in de ochtend' → voorkeur ochtend). Controleer die altijd.
 
   Bij een fout blijft het rooster ongewijzigd.
-- **Slots_Kans1 / Slots_Her**: voeg desgewenst de kolom **Casus na pauze** toe. Slots na de pauze krijgen dan die casus.
 - **Studenten**: de eerste kans vult nu de juiste kolommen *EersteDatum*, *EersteTijd*, *EersteBeoordelaar* en *EersteCasus*.
   - Het oude script schreef één kolom te vroeg, waardoor er datums in *IsHerkanser* stonden. Maak die cellen leeg en zet `Ja` bij de herkansers.
   - Zolang dat niet is gebeurd, verschijnt er een waarschuwing.
 
-> Let op: vul bij **Toetsduur jaar 2** de echte tijd voor jaar 2 in. Standaard staat er 10/15 min, net als in jaar 1, omdat de juiste waarde voor jaar 2 niet bekend was.
+> Let op: vul bij **Toetsduur jaar 2** de echte tijd voor jaar 2 in. Standaard staat er 15/20 min, net als in jaar 1, omdat de juiste waarde voor jaar 2 niet bekend was.
 
 ---
 
@@ -72,13 +95,18 @@ Pak de zip uit. Er hoeft niets anders geïnstalleerd te worden: Python en Qt zit
 
 1. Nog geen werkmap? Klik in de zijbalk op **Nieuw sjabloon…**. Je krijgt dan een lege werkmap met de juiste bladen en kolommen om in te vullen.
 2. **Werkmap openen…**: kies het Excel-bestand. Download het eerst uit OneDrive/SharePoint.
-3. Controleer de pagina **Instellingen**. Deze wordt gevuld vanuit het blad Instellingen van de werkmap. *Standaardwaarden* zet alles terug.
-4. Kies op de pagina **Rooster** voor **Eerste kans** of **Herkansing** en klik op **Rooster maken**.
-   - De kaarten tonen hoeveel studenten zijn ingeroosterd, en of er waarschuwingen zijn of studenten zonder plek.
+3. **Simu's importeren…** (zijbalk): kies het overzicht *Beschikbaarheid simu's*.
+   - De kolom van de toetsdag wordt vanzelf gekozen.
+   - Wie beschikbaar is, staat in de lijst; het aantal 'nodig' is alvast aangevinkt. Een '?' wordt niet aangevinkt.
+   - De gekozen simu's komen in het blad Simu en gaan mee bij *Excel opslaan*.
+4. Controleer de pagina **Instellingen**. Deze wordt gevuld vanuit het blad Instellingen van de werkmap. *Standaardwaarden* zet alles terug.
+5. Kies op de pagina **Rooster** voor **Eerste kans** of **Herkansing** en klik op **Rooster maken**.
+   - De kaarten tonen hoeveel studenten zijn ingeroosterd, hoeveel vrije plekken er over zijn, en of er waarschuwingen zijn of studenten zonder plek.
+   - Vrije plekken staan grijs in het rooster.
    - Details staan op het tabblad *Meldingen*.
-5. Exporteer:
+6. Exporteer:
    - **Excel opslaan…**: een **nieuw** bestand met het rooster, de uitdraai, de meldingen en de instellingen. Het origineel wordt nooit overschreven, zodat de scriptknoppen daarin intact blijven.
-   - **PDF voor docenten…**: per lokaal en dag een A4-pagina (liggend) met tijd, student, casus, beoordelaar en simucliënt.
+   - **PDF voor docenten…**: per lokaal en dag een A4-pagina (liggend) met tijd, student, casus, beoordelaar en simucliënt. Zonder vrije plekken.
    - **PDF voor studenten…**: alleen naam, lokaal en tijd, om te publiceren of op te hangen.
 
 De pagina **Hulp** in de app legt dezelfde stappen uit.

@@ -1,9 +1,10 @@
 """Herbruikbare UI-onderdelen: schakelaar, gesegmenteerde keuze, statistiekkaart en het instellingenformulier."""
 from __future__ import annotations
 
-from PySide6.QtCore import Property, QEasingCurve, QPropertyAnimation, QRectF, QSize, Qt, QTime, Signal
+from PySide6.QtCore import Property, QDate, QEasingCurve, QPropertyAnimation, QRectF, QSize, Qt, QTime, Signal
 from PySide6.QtGui import QColor, QPainter
-from PySide6.QtWidgets import (QAbstractButton, QButtonGroup, QComboBox, QFrame, QGridLayout,
+from PySide6.QtWidgets import (QAbstractButton, QButtonGroup, QComboBox, QDateEdit, QDialog, QDialogButtonBox,
+                               QFrame, QGridLayout, QListWidget, QListWidgetItem,
                                QHBoxLayout, QLabel, QLineEdit, QPushButton, QSpinBox, QTimeEdit, QVBoxLayout, QWidget)
 
 import rooster_core as rc
@@ -156,17 +157,12 @@ class InstellingenFormulier(QWidget):
         rechts.setColumnStretch(0, 1)
         rechts.setColumnStretch(1, 1)
         r = 0
-        if any(x["soort"] == "tijd" for x in items):
-            self.pauze = Schakelaar()
-            self.pauze.toggled.connect(self._pauze_aan)
-            self.pauze.toggled.connect(self.gewijzigd)
-            rechts.addWidget(self._schakelveld("Pauze inplannen", "Uit: de hele dag wordt doorgeroosterd.", self.pauze), r, 0, 1, 2)
-            r += 1
         kolom = 0
         for x in items:
             w = self._veld(x)
             self.velden[x["sleutel"]] = w
-            breed = isinstance(w, QComboBox) and (x["soort"] == "getal" or len(x["uitleg"]) > 60) or isinstance(w, Schakelaar)
+            breed = isinstance(w, QComboBox) and (x["soort"] == "getal" or len(x["uitleg"]) > 60) \
+                or isinstance(w, Schakelaar) or x["soort"] == "pauzes"
             if breed:
                 if kolom:
                     r, kolom = r + 1, 0
@@ -203,8 +199,10 @@ class InstellingenFormulier(QWidget):
             w = QComboBox()
             w.addItems(x["opties"])
             w.currentIndexChanged.connect(self.gewijzigd)
-        else:
+        else:  # tekst en pauzes
             w = QLineEdit()
+            if x["soort"] == "pauzes":
+                w.setPlaceholderText("bijv. 11:15-11:40, 13:00-13:55 (leeg = geen pauze)")
             w.textChanged.connect(self.gewijzigd)
         if isinstance(w, (QSpinBox, QTimeEdit)):
             w.lineEdit().setTextMargins(6, 0, 6, 0)  # QSS-padding werkt niet op het binnenveld
@@ -234,22 +232,17 @@ class InstellingenFormulier(QWidget):
         h.addWidget(w, 0, Qt.AlignVCenter)
         return kaart
 
-    def _pauze_aan(self, aan: bool):
-        for x in rc.INSTELLINGEN:
-            if x["soort"] == "tijd":
-                self.velden[x["sleutel"]].setEnabled(aan)
-
     # ---- waarden
 
     def waarden(self) -> dict:
-        """Sleutel -> waarde zoals in het blad Instellingen (tijd als dagfractie, '' = leeg)."""
+        """Sleutel -> waarde zoals in het blad Instellingen (tijd als tekst 09:40)."""
         uit = {}
         for x in rc.INSTELLINGEN:
             w = self.velden[x["sleutel"]]
             if x["soort"] == "getal":
                 uit[x["sleutel"]] = int(w.currentText()) if isinstance(w, QComboBox) else w.value()
             elif x["soort"] == "tijd":
-                uit[x["sleutel"]] = w.time().msecsSinceStartOfDay() / 86_400_000 if self.pauze.isChecked() else ""
+                uit[x["sleutel"]] = rc.tijd_tekst(w.time().msecsSinceStartOfDay() // 60_000)
             elif isinstance(w, Schakelaar):
                 uit[x["sleutel"]] = "Ja" if w.isChecked() else "Nee"
             elif isinstance(w, QComboBox):
@@ -261,7 +254,6 @@ class InstellingenFormulier(QWidget):
     def zet(self, ruw: dict) -> None:
         """Vult het formulier met ruwe waarden (bijv. uit rc.instellingen_waarden). Onbekende waarden -> standaard."""
         self.blockSignals(True)
-        pauze = False
         for x in rc.INSTELLINGEN:
             w, v = self.velden[x["sleutel"]], ruw.get(x["sleutel"], x["standaard"])
             if x["soort"] == "getal":
@@ -269,10 +261,12 @@ class InstellingenFormulier(QWidget):
                 n = int(t) if t.isdigit() and x["min"] <= int(t) <= x["max"] else x["standaard"]
                 w.setCurrentText(str(n)) if isinstance(w, QComboBox) else w.setValue(n)
             elif x["soort"] == "tijd":
-                m = rc.naar_minuten(v) if rc.tekst(v) else None
-                pauze = pauze or m is not None
-                m = m if m is not None else (12 * 60 if x["sleutel"] == "pauze_van" else 12 * 60 + 30)
+                m = rc.naar_minuten(v)
+                m = m if m is not None else rc.naar_minuten(x["standaard"])
                 w.setTime(QTime(m // 60, m % 60))
+            elif x["soort"] == "pauzes":
+                pz = rc.lees_pauzes(v)
+                w.setText(rc.pauzes_tekst(pz) if pz is not None else rc.tekst(v))
             else:
                 opties = [o for o in x["opties"] if rc.norm(o) == rc.norm(v)]
                 waarde = opties[0] if opties else (rc.tekst(v) if x["soort"] == "tekst" and rc.tekst(v) else x["standaard"])
@@ -282,10 +276,87 @@ class InstellingenFormulier(QWidget):
                     w.setCurrentText(waarde)
                 else:
                     w.setText(waarde)
-        self.pauze.setChecked(pauze)
-        self._pauze_aan(pauze)
         self.blockSignals(False)
         self.gewijzigd.emit()
 
     def herstel(self) -> None:
         self.zet(rc.STANDAARD)
+
+
+class SimuImport(QDialog):
+    """Kies een datumkolom uit het beschikbaarheidsoverzicht en vink de simucliënten aan voor de toetsdag."""
+
+    def __init__(self, kolommen: list, datum: int, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Simucliënten importeren")
+        self.setMinimumSize(520, 560)
+        self.kolommen = kolommen
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(24, 20, 24, 20)
+        lay.setSpacing(12)
+        lay.addWidget(label("Simucliënten importeren", "legenda"))
+        lay.addWidget(label("Kies de kolom van de toetsdag. Wie in die kolom beschikbaar is, staat hieronder; de eerste "
+                            "‘nodig’ zijn alvast aangevinkt. Ze komen in het blad Simu voor de gekozen datum.", "gedempt", wrap=True))
+        rij = QHBoxLayout()
+        kolom_v, datum_v = QVBoxLayout(), QVBoxLayout()
+        kolom_v.addWidget(label("Kolom in overzicht", "veldlabel"))
+        self.kolom = QComboBox()
+        self.kolom.addItems([k["titel"] for k in kolommen])
+        kolom_v.addWidget(self.kolom)
+        datum_v.addWidget(label("Datum toetsdag", "veldlabel"))
+        self.datum = QDateEdit(calendarPopup=True, displayFormat="dd-MM-yyyy")
+        self.datum.setDate(QDate(1899, 12, 30).addDays(datum))
+        datum_v.addWidget(self.datum)
+        rij.addLayout(kolom_v, 2)
+        rij.addLayout(datum_v, 1)
+        lay.addLayout(rij)
+        self.lijst = QListWidget()
+        self.lijst.setObjectName("vinklijst")
+        lay.addWidget(self.lijst, 1)
+        self.telling = label("", "uitleg")
+        lay.addWidget(self.telling)
+        knoppen = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        knoppen.button(QDialogButtonBox.Ok).setText("In blad Simu zetten")
+        knoppen.button(QDialogButtonBox.Ok).setObjectName("primair")
+        knoppen.button(QDialogButtonBox.Cancel).setText("Annuleren")
+        knoppen.accepted.connect(self.accept)
+        knoppen.rejected.connect(self.reject)
+        lay.addWidget(knoppen)
+        self.kolom.currentIndexChanged.connect(self._vul)
+        self.lijst.itemChanged.connect(self._tel)
+        # Voorkeuze: de kolom met dezelfde datum als de toetsdag.
+        import uitvoer
+        passend = [i for i, k in enumerate(kolommen) if uitvoer.datum_bij(k["dag_maand"], datum) == datum]
+        self.kolom.setCurrentIndex(passend[0] if passend else 0)
+        self._vul()
+
+    def _vul(self, *_):
+        k = self.kolommen[self.kolom.currentIndex()]
+        self.lijst.blockSignals(True)
+        self.lijst.clear()
+        nodig = k["nodig"] if k["nodig"] is not None else len(k["simus"])
+        aan = 0
+        for s in k["simus"]:
+            extra = "" if rc.norm(s["tekst"]) == "x" else f"  ·  {s['tekst']}"
+            item = QListWidgetItem(s["naam"] + extra)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            vink = s["zeker"] and aan < nodig
+            aan += vink
+            item.setCheckState(Qt.Checked if vink else Qt.Unchecked)
+            item.setData(Qt.UserRole, s)
+            self.lijst.addItem(item)
+        self.lijst.blockSignals(False)
+        self._tel()
+
+    def _tel(self, *_):
+        k = self.kolommen[self.kolom.currentIndex()]
+        n = len(self.gekozen())
+        nodig = f"nodig: {k['nodig']}" if k["nodig"] is not None else "aantal nodig onbekend"
+        self.telling.setText(f"{n} gekozen · {nodig}" + (f" · tijden in overzicht: {k['tijd']}" if k["tijd"] else ""))
+
+    def gekozen(self) -> list:
+        return [self.lijst.item(i).data(Qt.UserRole) for i in range(self.lijst.count())
+                if self.lijst.item(i).checkState() == Qt.Checked]
+
+    def gekozen_datum(self) -> int:
+        return QDate(1899, 12, 30).daysTo(self.datum.date())

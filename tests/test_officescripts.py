@@ -90,12 +90,52 @@ def andere_bladnamen():
 
 def oude_instellingen():
     b = mv.voorbeeld_bladen()
-    b["Instellingen"] = b["Instellingen"][:8]  # alleen de rijen van de vorige versie
-    b["Instellingen"][7][1] = ""  # pauze tot leeg -> fout: beide of geen
+    b["Instellingen"] = b["Instellingen"][:8]  # alleen de eerste rijen (oudere werkmap)
+    b["Instellingen"][7][1] = ""  # TTV-duur jaar 2 leeg -> fout
     return b
 
 
+def dag_met(**waarden):
+    def maak():
+        b = mv.dag_bladen()
+        b["Instellingen"] = rc.instellingen_matrix({**rc.instellingen_waarden(b["Instellingen"]), **waarden})
+        return b
+    return maak
+
+
+def dag_krap():
+    b = mv.dag_bladen()
+    b["Simu"][5][3] = "12:00"  # Wout alleen 's ochtends
+    b["Simu"][4][2] = "14:00"  # Vera pas 's middags
+    for rij in b["Toetsdag_Kans1"][1:]:
+        rij[3] = rij[2] + "b"
+    b["Toetsdag_Kans1"] = b["Toetsdag_Kans1"][:4]
+    b["Studenten"][31][7] = "Laat"
+    b["Studenten"][32][7] = "Vroeg"
+    b["Studenten"][33][7] = "Avond"  # onbekend -> waarschuwing
+    return b
+
+
+def dag_fouten():
+    b = mv.dag_bladen()
+    b["Toetsdag_Kans1"][1][6] = "Fien"
+    b["Toetsdag_Kans1"][5][1] = "C1.33-2"
+    b["Simu"][2][2] = "straks"
+    return b
+
+
+def dag_ongeldige_instellingen():
+    return dag_met(pauzes="lunch", start="25:00")()
+
+
 SCENARIOS = {
+    "dag": mv.dag_bladen,
+    "dag_anders": dag_met(simu_rotatie="Nee", casus_na="Na elke pauze afwisselen", ttv_plek="Zo vroeg mogelijk",
+                          ttv_eerst="Nee", vrije_plekken="Nee", wissel=10, pauzes="12:30-13:15", middag="13:00",
+                          her_beo="Verplicht", rooster_sort="Tijd, dan lokaal"),
+    "dag_krap": dag_krap,
+    "dag_fouten": dag_fouten,
+    "dag_ongeldige_instellingen": dag_ongeldige_instellingen,
     "alles_anders": met(jaar=2, duur2=20, ttv2=30, casus_na="Nee", ttv_plek="Zo vroeg mogelijk", ttv_eerst="Nee",
                         deelnaam="nee", her_beo="Verplicht", her_casus="Maakt niet uit", rooster_sort="Tijd, dan lokaal",
                         uitdraai_sort="Tijd", uitdraai_datum="Nee"),

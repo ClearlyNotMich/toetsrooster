@@ -96,6 +96,11 @@ QTableWidget::item {{ border-bottom: 1px solid #f0f0f0; padding: 0 10px; }}
 QHeaderView::section {{ background: {achtergrond}; color: {gedempt_tekst}; font-weight: 500; border: none;
                        border-bottom: 1px solid {rand}; padding: 0 14px; height: 38px; }}
 
+QListWidget#vinklijst {{ border: 1px solid {rand}; border-radius: 8px; padding: 6px; background: {achtergrond}; outline: none; }}
+QListWidget#vinklijst::item {{ min-height: 30px; padding: 0 6px; border-radius: 6px; }}
+QListWidget#vinklijst::item:hover {{ background: {gedempt}; }}
+QDialog {{ background: {achtergrond}; }}
+QDateEdit {{ min-height: 34px; padding: 0 10px; border: 1px solid {rand}; border-radius: 8px; background: {achtergrond}; }}
 QScrollBar:vertical {{ width: 10px; background: transparent; margin: 2px; }}
 QScrollBar:horizontal {{ height: 10px; background: transparent; margin: 2px; }}
 QScrollBar::handle {{ background: {rand_sterk}; border-radius: 3px; min-height: 24px; min-width: 24px; }}

@@ -11,8 +11,7 @@ import rooster_core as rc
 
 DAGEN = ["maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag", "zondag"]
 STUDENTEN_KOP = ["Studentnummer", "Voornaam", "Tussenvoegsel", "Achternaam", "klas", "Niet inroosteren bij SB-docent",
-                 "Niet inroosteren bij de vaardighedendocent", "TTV", "IsHerkanser"] + rc.EERSTE_KOP
-SLOTS_KOP = ["Datum", "Tijd", "Lokaal", "Casus", "Vaardigheid", "Casus na pauze"]
+                 "Niet inroosteren bij de vaardighedendocent", "TTV", "Voorkeur", "Opmerkingen", "IsHerkanser"] + rc.EERSTE_KOP
 CSS = """
 body { font-family: Arial, Helvetica, sans-serif; color: #0a0a0a; }
 h1 { font-size: 18pt; font-weight: 600; margin: 0 0 2pt 0; }
@@ -47,7 +46,9 @@ def html_rooster(titel: str, matrix: list) -> str:
     groepen: dict = {}
     niet = []
     for rij in matrix[1:]:
-        if rij[i["bijzheden"]] == "NIET INGEROOSTERD":
+        if rij[i["bijzheden"]] == rc.VRIJ:
+            continue  # vrije plekken alleen in het Excel-rooster
+        if rij[i["bijzheden"]] == rc.NIET:
             niet.append(rij)
         else:
             groepen.setdefault((rij[i["Datum"]], rij[i["Lokaal"]]), []).append(rij)
@@ -97,14 +98,104 @@ def maak_sjabloon(pad: str) -> None:
     """Lege werkmap met de juiste bladen en kolommen, om zelf in te vullen."""
     from openpyxl import Workbook
     s = rc.STANDAARD
+    dag = ["Datum", "Lokaal", "Casus", "Casus na pauze", "Vaardigheid", "Beoordelaar", "Beoordelaar 2", "Wissel om"]
     wb = Workbook()
     wb.remove(wb.active)
     rc.schrijf_bladen(wb, {
         s["blad_studenten"]: [STUDENTEN_KOP],
-        s["blad_slots1"]: [SLOTS_KOP],
-        s["blad_slots_her"]: [SLOTS_KOP],
-        s["blad_beo"]: [["Datum", "Tijd", "Beoordelaar", "Casus", "Lokaal"]],
-        s["blad_simu"]: [["Datum", "Tijd", "simucliënt", "Casus", "Lokaal"]],
+        s["blad_dag1"]: [dag],
+        s["blad_dag_her"]: [dag],
+        s["blad_simu"]: [["Datum", "simucliënt", "Vanaf", "Tot"]],
         rc.INSTELLINGEN_BLAD: rc.instellingen_matrix(),
     })
     wb.save(pad)
+
+
+# ---------------------------------------------------------------- beschikbaarheid simu's
+
+MAANDEN = {"jan": 1, "feb": 2, "mrt": 3, "maa": 3, "apr": 4, "mei": 5, "jun": 6, "jul": 7, "aug": 8, "sep": 9,
+           "okt": 10, "nov": 11, "dec": 12}
+
+
+def _dag_maand(titel: str):
+    """'Fysio jr 2\\n in les\\n22 sept' -> (22, 9); None als er geen datum in staat."""
+    import re
+    m = re.findall(r"(\d{1,2})\s*([a-z]{3})[a-z]*", titel.lower())
+    for dag, maand in reversed(m):
+        if maand in MAANDEN and 1 <= int(dag) <= 31:
+            return int(dag), MAANDEN[maand]
+    return None
+
+
+def datum_bij(dag_maand, rond: int) -> int | None:
+    """Kolomdatum zonder jaartal -> Excel-serienummer, met het jaar het dichtst bij datum `rond`."""
+    if not dag_maand:
+        return None
+    jaar = (dt.date(1899, 12, 30) + dt.timedelta(days=rond)).year
+    opties = [rc.serie(j, dag_maand[1], dag_maand[0]) for j in (jaar - 1, jaar, jaar + 1)]
+    opties = [o for o in opties if o is not None]
+    return min(opties, key=lambda o: abs(o - rond)) if opties else None
+
+
+def lees_cel_beschikbaar(v, middag: int) -> dict | None:
+    """Cel uit het beschikbaarheidsoverzicht -> {'van', 'tot', 'zeker', 'tekst'}; None = niet beschikbaar."""
+    import re
+    t = rc.tekst(v)
+    if not t:
+        return None
+    if t == "?":
+        return {"van": None, "tot": None, "zeker": False, "tekst": t}
+    tijd = r"(\d{1,2}(?:[:.]\d{2})?)"
+    los = lambda x: rc.naar_minuten(x if re.search(r"[:.]", x) else f"{x}:00")  # noqa: E731
+    m = re.search(tijd + r"\s*[-–]\s*" + tijd, t)
+    if m:
+        return {"van": los(m[1]), "tot": los(m[2]), "zeker": True, "tekst": t}
+    m = re.search(r"\btot\s+" + tijd, t.lower())
+    if m:
+        return {"van": None, "tot": los(m[1]), "zeker": True, "tekst": t}
+    m = re.search(r"\b(?:va|vanaf|van)\s+" + tijd, t.lower())
+    if m:
+        return {"van": los(m[1]), "tot": None, "zeker": True, "tekst": t}
+    if "middag" in t.lower():
+        return {"van": middag, "tot": None, "zeker": True, "tekst": t}
+    return {"van": None, "tot": None, "zeker": True, "tekst": t}  # X of andere aantekening
+
+
+def lees_beschikbaarheid(pad: str, middag: int = 12 * 60) -> list:
+    """Overzicht 'Beschikbaarheid simu's': rij 1 = namen + kolomtitels met datum, rij 2 = aantal nodig,
+    rij 3 = tijden, daarna één rij per simu. Geeft per datumkolom {titel, dag_maand, nodig, simus}."""
+    import re
+    from openpyxl import load_workbook
+    ws = load_workbook(pad, data_only=True).worksheets[0]
+    rijen = [list(r) for r in ws.iter_rows(values_only=True)]
+    if len(rijen) < 4:
+        raise ValueError("Te weinig rijen: verwacht kolomtitels, 'nodig', tijden en daarna één rij per simucliënt.")
+    kolommen = []
+    for c in range(1, len(rijen[0])):
+        titel = rc.tekst(rijen[0][c])
+        if not titel:
+            continue
+        nodig = re.search(r"\d+", rc.tekst(rc.cel(rijen[1], c)))
+        simus = []
+        for rij in rijen[3:]:
+            naam = rc.tekst(rc.cel(rij, 0))
+            b = lees_cel_beschikbaar(rc.cel(rij, c), middag) if naam else None
+            if b:
+                simus.append({"naam": naam, **b})
+        kolommen.append({"titel": " ".join(titel.split()), "dag_maand": _dag_maand(titel),
+                         "nodig": int(nodig[0]) if nodig else None, "tijd": rc.tekst(rc.cel(rijen[2], c)), "simus": simus})
+    return kolommen
+
+
+def simu_blad_met(oud: list | None, datum: int, gekozen: list) -> list:
+    """Blad Simu (dagvorm) met de rijen voor `datum` vervangen door `gekozen` ({naam, van, tot}).
+    Een oud blad met kolom Tijd (één rij per slot) wordt vervangen door de dagvorm."""
+    kop = ["Datum", "simucliënt", "Vanaf", "Tot"]
+    rijen = []
+    if oud and rc.kolom(oud[0], "tijd") < 0:
+        k = [rc.kolom(oud[0], "datum"), rc.kolom(oud[0], "simuclint", "simu", "simulant", "naam"),
+             rc.kolom(oud[0], "vanaf", "van"), rc.kolom(oud[0], "tot")]
+        rijen = [[rc.cel(r, i) for i in k] for r in oud[1:]
+                 if not rc.leeg(r) and rc.naar_datum(rc.cel(r, k[0])) != datum]
+    tijd = lambda m: "" if m is None else m / 1440  # noqa: E731
+    return [kop] + rijen + [[datum, s["naam"], tijd(s["van"]), tijd(s["tot"])] for s in gekozen]

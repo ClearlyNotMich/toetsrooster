@@ -1,49 +1,84 @@
 # Roosterregels (eerste kans en herkansing)
 
-De Office Scripts en de desktop-app gebruiken exact dezelfde regels.
+De Office Scripts en de desktop-app gebruiken exact dezelfde regels. De tests controleren dat beide dezelfde uitvoer geven.
+
+## Werkwijze in het kort
+
+Je vult drie dingen in. Het programma maakt de rest.
+
+1. **Studenten**: één rij per student. Kolommen worden op kopnaam gevonden. Ook de namen uit het echte bestand werken (*Roepnaam*, *Klas p2*, *Niet inroosteren bij SB-docent P2*). Optioneel:
+   - *TTV* (Ja);
+   - *Voorkeur* (Ochtend / Middag / Vroeg / Laat);
+   - *Opmerkingen*;
+   - *IsHerkanser* (Ja).
+2. **Toetsdag_Kans1** / **Toetsdag_Her**: één rij per lokaal per toetsdag, met deze kolommen:
+   - *Datum*, *Lokaal*, *Casus*;
+   - *Casus na pauze* (optioneel), *Vaardigheid*, *Beoordelaar*;
+   - *Beoordelaar 2* en *Wissel om* (optioneel), voor een wissel halverwege de dag. Bijvoorbeeld: Youri tot 12:25, daarna Nadine.
+3. **Simu**: één rij per simucliënt per toetsdag: *Datum*, *simucliënt*, en optioneel *Vanaf* en *Tot*. Een lege datum betekent elke dag. In de app vul je dit blad met **Simu's importeren…** vanuit het overzicht *Beschikbaarheid simu's*.
+
+Uit de instellingen (eerste toets, laatste toets, toetsduur, wisseltijd en pauzes) maakt het programma alle slots. Met de standaardwaarden is dat elke 20 minuten een student (15 min toets + 5 min wissel): 09:40–11:15, 11:45–13:00, 14:00–15:15 en 15:45–17:00. Dat zijn 17 slots per lokaal, net als op de echte toetsdag van 14 april.
+
+> **Standaard toetsduur gewijzigd:** van 10/15 naar **15 min, TTV 20 min**. De eerdere keuze kwam uit de oude testwerkmap, met slots per 10 minuten. Het echte rooster (M1.6 kans 1) gebruikt 15 minuten toets plus 5 minuten wissel. Pas het per toets aan bij Instellingen. De TTV-duur van 20 minuten is een aanname; controleer die.
+
+**Oude werkwijze:** is het blad Toetsdag leeg en bestaat *Slots_Kans1* / *Slots_Her* (één rij per begintijd), dan worden de oude bladen gebruikt, samen met *Beoordelaars*. Een *Simu*-blad met een kolom *Tijd* wordt ook nog gelezen als één rij per slot.
+
+## Uitvoer
+
+- **Rooster_Kans1 / Rooster_Her**: het volledige rooster voor de organisatie. Lege, bruikbare plekken staan erin als **Vrije plek**, met lokaal, casus, beoordelaar en simucliënt. Dat kun je uitzetten.
+- **Uitdraai_Kans1 / Uitdraai_Her**: alleen naam, lokaal en tijd, om te publiceren. Hier staan nooit vrije plekken in.
+- **Meldingen**: telling, waarschuwingen en fouten, plus elke opmerking uit *Opmerkingen*, met hoe die is gelezen. Controleer die opmerkingen altijd.
+- **App: PDF voor docenten** (per lokaal per dag een pagina) en **PDF voor studenten**. In geen van beide staan vrije plekken.
 
 ## Feedback → hoe het nu werkt
 
 | Feedback | Uitwerking |
 |---|---|
-| Casus vóór de pauze, een andere erna | Blad **Instellingen**: `Pauze van` / `Pauze tot`. In de slotbladen staat een optionele kolom **Casus na pauze**: slots na de pauze krijgen die casus. Slots ín de pauze worden overgeslagen. Wordt in een lokaal dezelfde casus vóór én na de pauze gebruikt, dan verschijnt er een waarschuwing. |
-| Uitdraai voor studenten zonder studentnummer, casus etc. | Nieuwe bladen **Uitdraai_Kans1** / **Uitdraai_Her** met alleen *Naam*, *Lokaal* en *Tijd* (datum + begintijd), gesorteerd op achternaam. |
-| TTV | Kolom **TTV** = `Ja` → de student krijgt de TTV-toetsduur en komt bij voorkeur in het **laatste slot vóór de pauze**, zodat de extra tijd in de pauze valt (zoals de notitie "einde van het blok voor pauze extra tijd"). Zonder pauze: laatste slot van de dag. Bijzonderheden toont `TTV (15 min)`. |
-| Jaar 2 tijd anders | Instellingen **Jaar** (1 of 2) kiest welke toetsduur geldt; per jaar staan een gewone en een TTV-duur. *Standaard staan beide jaren op 10/15 min: vul de juiste tijd voor jaar 2 in.* |
-| 30 voor 45 min toets | Niet eenduidig. De slots, beoordelaars en simucliënten in de werkmap staan per **10 minuten**, en het oude script gaf iedere rij één student. Daarom is besloten: **gewone toets 10 min (één slot), TTV 15 min** (instelbaar). Een eerdere inschatting van 30/45 min paste maar 8 van de 12 studenten in de echte werkmap. Bedoel je echt 30/45 min, vul dat dan in bij Instellingen. |
-| Lokaal + casus | Het volledige rooster is gesorteerd op datum → lokaal → tijd, zodat per lokaal de casus in één blok staat; kolommen Lokaal en Casus staan erin. |
+| Casus vóór de pauze, een andere erna | Kolom **Casus na pauze** in het blad Toetsdag, plus de instelling *Casus na pauze*: na pauze 1, 2 of 3, of afwisselend na elke pauze. Een waarschuwing volgt als beide casussen gelijk zijn. |
+| Uitdraai voor studenten zonder studentnummer, casus etc. | Bladen **Uitdraai_*** en de PDF voor studenten: alleen naam, lokaal en tijd. |
+| TTV | *TTV* = Ja, of 'ttv' in *Opmerkingen*. De student krijgt de TTV-duur en komt bij voorkeur in het **laatste slot vóór een pauze**, zodat de extra tijd in de pauze valt. |
+| Jaar 2 tijd anders | Instelling **Jaar** kiest welke toetsduur geldt. Per jaar is er een gewone duur en een TTV-duur. |
+| 30 voor 45 min toets | Nog niet eenduidig. Alle duren zijn instelbaar; de standaard volgt het echte rooster (15 + 5 min). |
+| Lokaal + casus | Het rooster staat per datum → lokaal → tijd. Per lokaal staan de casus en de vaardigheid erbij. |
 
 ## Instellingen
 
-Alle instellingen staan in het blad **Instellingen**, en in de app op de pagina *Instellingen*. Beide gebruiken dezelfde lijst (`INSTELLINGEN` in `app/rooster_core.py`). `tools/bouw_scripts.py` zet die lijst ook in de Office Scripts.
+Alle instellingen staan in het blad **Instellingen** en in de app op de pagina *Instellingen*. Beide gebruiken dezelfde lijst (`INSTELLINGEN` in `app/rooster_core.py`); `tools/bouw_scripts.py` zet die lijst ook in de Office Scripts.
 
-- Ontbreekt een rij, dan vult het script of de app die aan met de standaardwaarde.
+- Ontbreekt een rij, dan wordt die aangevuld met de standaardwaarde.
 - Een ongeldige waarde geeft een fout op het blad Meldingen. Het rooster blijft dan ongewijzigd.
 
 <!-- tabel: gegenereerd uit rooster_core.INSTELLINGEN -->
 | Groep | Instelling | Standaard | Wat het doet |
 |---|---|---|---|
+| Toetsdag | Eerste toets om | 09:40 | Begintijd van de eerste student. |
+| Toetsdag | Laatste toets klaar om | 17:00 | Geen toets loopt later door dan deze tijd. |
+| Toetsdag | Wisseltijd (min) | 5 | Tijd tussen twee studenten. |
 | Toetsduur | Jaar | 1 | Studiejaar van deze toets; bepaalt welke duur hieronder geldt. |
-| Toetsduur | Toetsduur jaar 1 (min) | 10 | Gewone toets in jaar 1 (10 min = één slot). |
-| Toetsduur | TTV-toetsduur jaar 1 (min) | 15 | Toets met tijdverlenging in jaar 1. |
-| Toetsduur | Toetsduur jaar 2 (min) | 10 | Gewone toets in jaar 2. |
-| Toetsduur | TTV-toetsduur jaar 2 (min) | 15 | Toets met tijdverlenging in jaar 2. |
-| Pauze | Pauze van | (leeg) | Begin van de pauze, bijv. 12:00. |
-| Pauze | Pauze tot | (leeg) | Einde van de pauze, bijv. 12:30. |
-| Pauze | Casus na pauze gebruiken | Ja | Slots na de pauze krijgen de casus uit de kolom 'Casus na pauze'. Keuzes: Ja / Nee. |
-| TTV | TTV-plaatsing | Eind van blok vóór pauze | Waar TTV-studenten bij voorkeur komen. Aan het eind van het blok valt de extra tijd in de pauze. Keuzes: Eind van blok vóór pauze / Zo vroeg mogelijk. |
+| Toetsduur | Toetsduur jaar 1 (min) | 15 | Gewone toets in jaar 1. |
+| Toetsduur | TTV-toetsduur jaar 1 (min) | 20 | Toets met tijdverlenging in jaar 1. |
+| Toetsduur | Toetsduur jaar 2 (min) | 15 | Gewone toets in jaar 2. |
+| Toetsduur | TTV-toetsduur jaar 2 (min) | 20 | Toets met tijdverlenging in jaar 2. |
+| Pauze | Pauzes | 11:15-11:40, 13:00-13:55, 15:15-15:40 | Van-tot, meerdere gescheiden door een komma. Leeg = geen pauze. |
+| Pauze | Casus na pauze | Na pauze 1 | Wanneer slots de casus uit de kolom 'Casus na pauze' krijgen (alleen als die kolom is ingevuld). Keuzes: Nee / Na pauze 1 / Na pauze 2 / Na pauze 3 / Na elke pauze afwisselen. |
+| TTV | TTV-plaatsing | Eind van blok vóór pauze | Waar TTV-studenten bij voorkeur komen. Aan het eind van een blok valt de extra tijd in de pauze. Keuzes: Eind van blok vóór pauze / Zo vroeg mogelijk. |
 | TTV | TTV-studenten eerst inroosteren | Ja | Geeft TTV-studenten als eerste een plek, zodat de beste plekken voor hen vrij zijn. Keuzes: Ja / Nee. |
+| Voorkeur | Middag begint om | 12:00 | Grens tussen voorkeur ochtend en middag. |
+| Simucliënten | Simu's rouleren per blok | Ja | Na elke pauze schuift elke simucliënt een lokaal door. Nee: iedere simu blijft in hetzelfde lokaal. Keuzes: Ja / Nee. |
 | Beoordelaars | Namen deels vergelijken | Ja | ‘Ann’ sluit dan ook ‘Anneke’ uit. Vangt spelfouten op, maar kan te veel uitsluiten. Keuzes: Ja / Nee. |
 | Herkansing | Andere beoordelaar dan 1e kans | Voorkeur | Verplicht: lukt het niet, dan wordt de student niet ingeroosterd. Keuzes: Voorkeur / Verplicht / Maakt niet uit. |
 | Herkansing | Andere casus dan 1e kans | Voorkeur | Verplicht: lukt het niet, dan wordt de student niet ingeroosterd. Keuzes: Voorkeur / Verplicht / Maakt niet uit. |
+| Uitvoer | Vrije plekken tonen | Ja | Lege maar bruikbare plekken als 'Vrije plek' in het volledige rooster (nooit op de uitdraai of in de PDF's). Keuzes: Ja / Nee. |
 | Uitvoer | Rooster sorteren op | Lokaal, dan tijd | Volgorde van het volledige rooster (altijd eerst per datum). Keuzes: Lokaal, dan tijd / Tijd, dan lokaal. |
 | Uitvoer | Uitdraai sorteren op | Achternaam | Volgorde van de uitdraai voor studenten. Keuzes: Achternaam / Tijd / Lokaal, dan tijd. |
 | Uitvoer | Datum op uitdraai | Ja | Nee: alleen de begintijd (handig als alles op één dag is). Keuzes: Ja / Nee. |
 | Bladnamen | Blad studenten | Studenten | Naam van het blad. |
-| Bladnamen | Blad slots eerste kans | Slots_Kans1 | Naam van het blad. |
-| Bladnamen | Blad slots herkansing | Slots_Her | Naam van het blad. |
-| Bladnamen | Blad beoordelaars | Beoordelaars | Naam van het blad. |
+| Bladnamen | Blad toetsdag eerste kans | Toetsdag_Kans1 | Naam van het blad. |
+| Bladnamen | Blad toetsdag herkansing | Toetsdag_Her | Naam van het blad. |
 | Bladnamen | Blad simucliënten | Simu | Naam van het blad. |
+| Bladnamen | Blad slots eerste kans (oud) | Slots_Kans1 | Naam van het blad. |
+| Bladnamen | Blad slots herkansing (oud) | Slots_Her | Naam van het blad. |
+| Bladnamen | Blad beoordelaars (oud) | Beoordelaars | Naam van het blad. |
 | Bladnamen | Blad rooster eerste kans | Rooster_Kans1 | Naam van het blad. |
 | Bladnamen | Blad rooster herkansing | Rooster_Her | Naam van het blad. |
 | Bladnamen | Blad uitdraai eerste kans | Uitdraai_Kans1 | Naam van het blad. |
@@ -52,26 +87,37 @@ Alle instellingen staan in het blad **Instellingen**, en in de app op de pagina 
 
 ## Planningsregels
 
-1. Elke rij in `Slots_Kans1` / `Slots_Her` is een mogelijke **begintijd** in een lokaal. Slots mogen in stappen van 10 minuten staan: een toets die langer is dan één slot (bijv. TTV 15 min) blokkeert het lokaal, de beoordelaar en de simucliënt tot de eindtijd, zodat overlappende slots vanzelf vervallen.
-2. Een gewone toets moet vóór `Pauze van` klaar zijn. Een TTV-toets mag doorlopen tot `Pauze tot`.
-3. Beoordelaar en simucliënt moeten op de **begintijd** in hun blad staan en mogen op dat moment geen andere student hebben. Staat er bij hen een *Casus* (of bij de simucliënt een *Lokaal*), dan worden ze alleen daarvoor ingezet.
-4. Beoordelaars die in *Niet inroosteren bij SB-docent* of *Niet inroosteren bij de vaardighedendocent* staan, worden voor die student overgeslagen. Meerdere namen scheid je met `,` of `;`. Een deel van de naam is genoeg, net als in het oude script.
-5. Volgorde van inroosteren:
-   - Eerst de TTV-studenten, daarna de rest, in de volgorde van het blad Studenten.
-   - Een gewone student krijgt het vroegste slot dat past.
-6. **Eerste kans** roostert iedereen met `IsHerkanser` ≠ `Ja` in en schrijft `EersteDatum`, `EersteTijd`, `EersteBeoordelaar` en `EersteCasus` terug in het blad Studenten. Dit herstelt de oude fout die één kolom te vroeg schreef.
-7. **Herkansing** roostert alleen `IsHerkanser` = `Ja` in, met `Slots_Her`. Of de beoordelaar en de casus anders moeten zijn dan bij de eerste kans, stel je in:
-   - *Voorkeur*: eerst anders proberen; lukt dat niet, dan mag hetzelfde. Dat staat dan in *bijzheden* en op Meldingen.
-   - *Verplicht*: het moet anders.
-   - *Maakt niet uit*: geen eis.
-8. Een student die niet past, verdwijnt niet:
-   - de student staat onderaan het rooster met `NIET INGEROOSTERD`;
-   - het blad **Meldingen** bevat een waarschuwing.
-9. Eerst wordt alles gecontroleerd. Bij een fout, zoals een ontbrekend blad, ontbrekende kolom, ongeldige tijd of ongeldige instelling, blijft het rooster ongewijzigd en staat de fout op **Meldingen**.
-10. Kolommen worden op **kopnaam** gevonden, niet op positie. Een extra kolom zoals `TTV` verschuift dus niets meer.
+1. **Slots.** Per rij in het blad Toetsdag komt er een slot op elke begintijd. Een gewone toets raakt nooit een pauze en loopt nooit na *Laatste toets klaar om*.
+2. **Beoordelaar.** Per lokaal staat de beoordelaar uit het blad Toetsdag. Na *Wissel om* is dat *Beoordelaar 2*.
+3. **Simucliënten** komen uit het blad Simu, voor die datum en binnen *Vanaf*/*Tot*. Per blok (het deel tussen twee pauzes) krijgt lokaal *k* simucliënt *(k + blok) mod n*, zodat ze na elke pauze een lokaal doorschuiven. Zijn er minder geschikte simu's dan lokalen, dan volgt een waarschuwing en draait niet elk lokaal.
+4. **Uitsluitingen.** Beoordelaars in *Niet inroosteren bij …* worden voor die student overgeslagen. Namen scheid je met `,` `;` of `/` (bijvoorbeeld `Sofie/Youri`). Met *Namen deels vergelijken* telt een deel van de naam ook.
+5. **Volgorde:**
+   - eerst TTV-studenten;
+   - dan studenten met een voorkeur;
+   - dan de rest, in de volgorde van het blad Studenten.
+
+   Plaatsing:
+   - TTV: het slot dat het dichtst vóór een pauze begint.
+   - *Ochtend*: het vroegste slot vóór *Middag begint om*.
+   - *Middag*: het vroegste slot daarna.
+   - *Vroeg*: het vroegste slot.
+   - *Laat*: het laatste slot.
+
+   Een gemiste ochtend- of middagwens geeft een waarschuwing.
+6. **TTV-toets.** Mag doorlopen in de pauze direct erna.
+7. **Opmerkingen.** De woorden *ttv*, *ochtend*, *middag*, *vroeg* en *laat* worden herkend. Elke opmerking staat op Meldingen om te controleren, en de volledige tekst staat in *bijzheden*.
+8. **Eerste kans** roostert iedereen met `IsHerkanser` ≠ `Ja` in. Daarna schrijft het `EersteDatum`, `EersteTijd`, `EersteBeoordelaar` en `EersteCasus` terug in het blad Studenten.
+9. **Herkansing** roostert alleen `IsHerkanser` = `Ja` in. Een andere beoordelaar en een andere casus dan bij de eerste kans kun je instellen als *Voorkeur*, *Verplicht* of *Maakt niet uit*.
+10. **Niemand verdwijnt.** Wie niet past, staat onderaan het rooster met `NIET INGEROOSTERD` en op Meldingen.
+11. **Eerst controleren.** Bij een fout blijft het rooster ongewijzigd. Voorbeelden van fouten:
+   - een ontbrekend blad of een ontbrekende kolom;
+   - een dubbel lokaal;
+   - *Beoordelaar 2* zonder *Wissel om*;
+   - een ongeldige tijd of pauze.
 
 ## Bekende beperkingen
 
-- De beschikbaarheid van beoordelaar en simucliënt wordt alleen op de begintijd gecontroleerd, niet voor elke tien minuten van de toets.
-- Na het laatste slot van de dag wordt niet gecontroleerd of de toets nog binnen de beschikbare tijd valt. Zet dus alleen begintijden in de slotbladen die nog passen.
-- De pauze geldt voor alle dagen en alle lokalen.
+- De pauzes gelden voor alle dagen en alle lokalen.
+- Een simucliënt rouleert per blok en alleen als hij het hele blok beschikbaar is (*Vanaf*/*Tot*).
+- Simu's met '?' in het beschikbaarheidsoverzicht worden bij importeren niet vooraf aangevinkt.
+- Het Word-bestand *Overzichtslijst* wordt niet ingelezen. Het is alleen naslag; de bevestigde simu's staan ook in het beschikbaarheidsoverzicht.

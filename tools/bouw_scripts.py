@@ -7,10 +7,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "app"))
 from rooster_core import INSTELLINGEN  # noqa: E402
 DOELEN = {
-    "OWB Exam Roster Generator.txt": {"__MODUS__": "kans1", "__MODUS_NAAM__": "EERSTE KANS", "__SLOTS__": "Slots_Kans1",
+    "OWB Exam Roster Generator.txt": {"__MODUS__": "kans1", "__MODUS_NAAM__": "EERSTE KANS", "__SLOTS__": "Slots_Kans1", "__DAG__": "Toetsdag_Kans1",
         "__ROOSTER__": "Rooster_Kans1", "__UITDRAAI__": "Uitdraai_Kans1",
         "__EXTRA__": ",\n *           EersteDatum/EersteTijd/EersteBeoordelaar/EersteCasus in Studenten"},
-    "OWB Retake Exam Roster Generator.txt": {"__MODUS__": "her", "__MODUS_NAAM__": "HERKANSING", "__SLOTS__": "Slots_Her",
+    "OWB Retake Exam Roster Generator.txt": {"__MODUS__": "her", "__MODUS_NAAM__": "HERKANSING", "__SLOTS__": "Slots_Her", "__DAG__": "Toetsdag_Her",
         "__ROOSTER__": "Rooster_Her", "__UITDRAAI__": "Uitdraai_Her", "__EXTRA__": ""},
 }
 

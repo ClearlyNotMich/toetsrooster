@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (QApplication, QButtonGroup, QFileDialog, QFrame, 
 import rooster_core as rc
 import thema
 import uitvoer
-from onderdelen import InstellingenFormulier, Segment, StatKaart, label
+from onderdelen import InstellingenFormulier, Segment, SimuImport, StatKaart, label
 from thema import KLEUR
 
 HULP = """
@@ -29,19 +29,25 @@ HULP = """
 <ol>
 <li><b>Vul de werkmap.</b> Begin met <i>Nieuw sjabloon…</i> in de zijbalk, of gebruik de werkmap van vorige keer:
   <ul>
-  <li><b>Studenten</b> — één rij per student. <i>TTV</i> = Ja voor tijdverlenging, <i>IsHerkanser</i> = Ja voor de herkansing.
-      In <i>Niet inroosteren bij …</i> zet je docenten die deze student niet mogen beoordelen (scheiden met , of ;).</li>
-  <li><b>Slots_Kans1 / Slots_Her</b> — elke rij is een begintijd in een lokaal, met de casus (en eventueel <i>Casus na pauze</i>).</li>
-  <li><b>Beoordelaars</b> en <b>Simu</b> — wie op welke datum en begintijd beschikbaar is.</li>
+  <li><b>Studenten</b> — één rij per student. <i>TTV</i> = Ja voor tijdverlenging, <i>Voorkeur</i> = Ochtend/Middag/Vroeg/Laat,
+      <i>IsHerkanser</i> = Ja voor de herkansing. In <i>Niet inroosteren bij …</i> zet je docenten die deze student niet mogen
+      beoordelen (scheiden met , ; of /). Tekst in <i>Opmerkingen</i> zoals ‘ttv bij uitvoering’ of ‘graag in de ochtend’
+      wordt herkend en staat bij Meldingen om te controleren.</li>
+  <li><b>Toetsdag_Kans1 / Toetsdag_Her</b> — één rij per lokaal per toetsdag: datum, lokaal, casus (en eventueel
+      <i>Casus na pauze</i>), vaardigheid en beoordelaar. Wisselt de beoordelaar halverwege, vul dan <i>Beoordelaar 2</i>
+      en <i>Wissel om</i> in.</li>
+  <li><b>Simu</b> — één rij per simucliënt per toetsdag, eventueel met <i>Vanaf</i>/<i>Tot</i>.
+      Sneller: <i>Simu's importeren…</i> in de zijbalk neemt ze over uit het overzicht ‘Beschikbaarheid simu's’.</li>
   </ul></li>
 <li><b>Open de werkmap</b> hier (download hem eerst uit OneDrive/SharePoint).</li>
-<li>Controleer de <b>instellingen</b>: toetsduur, pauze en de regels voor TTV en herkansing.</li>
+<li>Controleer de <b>instellingen</b>: eerste en laatste toets, toetsduur, wisseltijd en pauzes. Daaruit worden alle
+  tijdslots gemaakt (standaard elke 20 minuten van 09:40 tot 17:00, met drie pauzes). Simu's schuiven na elke pauze een lokaal door.</li>
 <li>Kies <b>Eerste kans</b> of <b>Herkansing</b> en klik op <b>Rooster maken</b>.
-  Kijk bij <i>Meldingen</i> of iedereen een plek heeft.</li>
+  Kijk bij <i>Meldingen</i> of iedereen een plek heeft en of de opmerkingen goed zijn gelezen.</li>
 <li><b>Exporteer</b>:
   <ul>
-  <li><b>Excel opslaan</b> — een nieuwe werkmap met het rooster, de uitdraai en de meldingen.</li>
-  <li><b>PDF voor docenten</b> — per lokaal en dag een pagina om op te hangen.</li>
+  <li><b>Excel opslaan</b> — een nieuwe werkmap met het rooster (inclusief grijze <i>Vrije plek</i>-rijen), de uitdraai en de meldingen.</li>
+  <li><b>PDF voor docenten</b> — per lokaal en dag een pagina om op te hangen, zonder vrije plekken.</li>
   <li><b>PDF voor studenten</b> — alleen naam, lokaal en tijd; geschikt om te publiceren.</li>
   </ul></li>
 </ol>
@@ -50,7 +56,8 @@ HULP = """
 <i>Instellingen</i>; de app schrijft jouw instellingen daarin bij <i>Excel opslaan</i>.</p>
 <h3>Iets klopt niet?</h3>
 <p>Studenten die niet passen staan onderaan het rooster als <i>NIET INGEROOSTERD</i> en in <i>Meldingen</i>.
-Meestal zijn er te weinig slots, beoordelaars of simucliënten op dat moment. Voeg die toe in de werkmap en maak het rooster opnieuw.</p>
+Meestal zijn er te weinig plekken, sluiten de uitsluitingen alle beoordelaars van een student uit, of zijn er te weinig
+simucliënten in een blok. Pas de werkmap of de instellingen aan en maak het rooster opnieuw.</p>
 """
 
 
@@ -159,6 +166,10 @@ class Venster(QMainWindow):
         sjabloon.setToolTip("Lege werkmap met de juiste bladen en kolommen om zelf in te vullen.")
         sjabloon.clicked.connect(self.sjabloon)
         lay.addWidget(sjabloon)
+        self.knop_import = QPushButton("Simu's importeren…", cursor=Qt.PointingHandCursor)
+        self.knop_import.setToolTip("Simucliënten voor de toetsdag overnemen uit het overzicht ‘Beschikbaarheid simu's’.")
+        self.knop_import.clicked.connect(lambda: self.importeer_simus())
+        lay.addWidget(self.knop_import)
         return z
 
     def _rooster_pagina(self) -> QWidget:
@@ -282,21 +293,23 @@ class Venster(QMainWindow):
         s = self.instellingen.waarden()
         j = s["jaar"]
         tekst = f"Jaar {j} · toets {s[f'duur{j}']} min · TTV {s[f'ttv{j}']} min · "
-        tekst += (f"pauze {rc.tijd_tekst(rc.naar_minuten(s['pauze_van']))}–{rc.tijd_tekst(rc.naar_minuten(s['pauze_tot']))}"
-                  if s["pauze_van"] != "" else "geen pauze")
+        pz = rc.lees_pauzes(s["pauzes"])
+        tekst += f"{s['start']}–{s['eind']} · "
+        tekst += (f"{len(pz)} pauze{'s' if len(pz) != 1 else ''}" if pz else "geen pauze") if pz is not None else "pauzes ongeldig"
         self.samenvatting.setText(tekst)
 
     def toon_leeg(self):
         open_ = self.bladen is not None
         self.leeg_titel.setText("Klaar om te roosteren" if open_ else "Nog geen werkmap geopend")
         self.leeg_tekst.setText("Controleer de instellingen en klik op ‘Rooster maken’." if open_ else
-                                "Open de Excel-werkmap met studenten, slots, beoordelaars en simucliënten,\n"
+                                "Open de Excel-werkmap met studenten, de toetsdag en de simucliënten,\n"
                                 "of begin met een nieuw sjabloon.")
         self.leeg_knop.setVisible(not open_)
         self.kaart_stapel.setCurrentIndex(0)
         for s in (self.stat_in, self.stat_waarsch, self.stat_niet):
             s.zet("–")
         self.knop_maak.setEnabled(open_)
+        self.knop_import.setEnabled(open_)
         for k in (self.knop_opslaan, self.knop_pdf, self.knop_pdf_rooster):
             k.setEnabled(False)
 
@@ -308,10 +321,14 @@ class Venster(QMainWindow):
         tabel.setHorizontalHeaderLabels([KOPPEN.get(rc.tekst(k), rc.tekst(k)) for k in kop])
         for r, rij in enumerate(data):
             soort = rc.tekst(rij[0]) if kop == rc.MELDINGEN_KOP else ""
-            niet = "NIET INGEROOSTERD" in rij
+            niet = rc.NIET in rij
+            vrij = rc.VRIJ in rij
             for c, waarde in enumerate(rij):
                 item = QTableWidgetItem(toon(kop[c], waarde))
-                if niet or soort == "Fout":
+                if vrij:
+                    item.setForeground(QColor(KLEUR["gedempt_tekst"]))
+                    item.setBackground(QColor(KLEUR["gedempt"]))
+                elif niet or soort == "Fout":
                     item.setForeground(QColor(KLEUR["fout"]))
                     item.setBackground(QColor(KLEUR["fout_zacht"]))
                 elif soort == "Waarschuwing" and c == 0:
@@ -343,6 +360,7 @@ class Venster(QMainWindow):
             QMessageBox.critical(self, "Kan werkmap niet openen", f"{pad}\n\n{e}\n\nIs het bestand nog geopend in Excel?")
             return False
         self.pad, self.bladen, self.resultaat = pad, bladen, None
+        self.ingevoerd = {}  # in de app aangepaste invoerbladen (bijv. Simu na importeren); gaan mee bij opslaan
         self.instellingen.zet(rc.instellingen_waarden(bladen.get(rc.INSTELLINGEN_BLAD)))
         self.lbl_bestand.setText(Path(pad).name)
         n = max(0, len(bladen.get(self.instellingen.waarden()["blad_studenten"], [])) - 1)
@@ -356,6 +374,8 @@ class Venster(QMainWindow):
         bladen[rc.INSTELLINGEN_BLAD] = rc.instellingen_matrix(self.instellingen.waarden())
         r = rc.maak_rooster(bladen, self.modus.waarde())
         r["bladen"][rc.INSTELLINGEN_BLAD] = bladen[rc.INSTELLINGEN_BLAD]
+        if not r["fouten"]:
+            r["bladen"].update(self.ingevoerd)
         r["modus"] = self.modus.waarde()
         self.resultaat = r
         meld = r["bladen"][r["namen"]["meldingen"]]
@@ -375,9 +395,11 @@ class Venster(QMainWindow):
             rooster = r["bladen"][r["namen"]["rooster"]]
             self.vul(self.tabel_rooster, rooster)
             self.vul(self.tabel_uitdraai, r["bladen"][r["namen"]["uitdraai"]])
-            niet = sum(1 for rij in rooster if "NIET INGEROOSTERD" in rij)
-            totaal = len(rooster) - 1
-            self.stat_in.zet(f"{totaal - niet} / {totaal}", rc.MODI[r["modus"]]["naam"].lower())
+            niet = sum(1 for rij in rooster if rc.NIET in rij)
+            vrij = sum(1 for rij in rooster if rc.VRIJ in rij)
+            totaal = len(rooster) - 1 - vrij
+            self.stat_in.zet(f"{totaal - niet} / {totaal}", rc.MODI[r["modus"]]["naam"].lower()
+                             + (f" · {vrij} vrije plekken" if vrij else ""))
             self.stat_waarsch.zet(str(waarsch), "zie Meldingen" if waarsch else "alles in orde",
                                   KLEUR["let_op"] if waarsch else None)
             self.stat_niet.zet(str(niet), "studenten zonder plek" if niet else "iedereen heeft een plek",
@@ -434,6 +456,42 @@ class Venster(QMainWindow):
         doel = self._doel("PDF voor docenten", f"{namen['rooster']}.pdf", "PDF (*.pdf)", doel)
         titel = f"Toetsrooster {rc.MODI[self.resultaat['modus']]['naam'].lower()}"
         return doel and self._bewaar_pdf(doel, uitvoer.html_rooster(titel, self.resultaat["bladen"][namen["rooster"]]), True)
+
+    def toetsdatum(self) -> int:
+        """Eerste datum in het blad Toetsdag van de gekozen toets (anders vandaag)."""
+        w = self.instellingen.waarden()
+        dag = self.bladen.get(w[rc.MODI[self.modus.waarde()]["dag"]]) or []
+        c = rc.kolom(dag[0], "datum") if dag else -1
+        datums = [rc.naar_datum(rij[c]) for rij in dag[1:] if c >= 0 and rc.naar_datum(rc.cel(rij, c))]
+        import datetime as dt
+        return min(datums) if datums else (dt.date.today() - dt.date(1899, 12, 30)).days
+
+    def importeer_simus(self, pad: str | None = None, kies=None) -> bool:
+        """Simucliënten uit het beschikbaarheidsoverzicht in het blad Simu zetten. `kies` vervangt de dialoog (tests)."""
+        if not pad:
+            pad, _ = QFileDialog.getOpenFileName(self, "Beschikbaarheid simu's openen", str(Path(self.pad).parent),
+                                                 "Excel-werkmap (*.xlsx *.xlsm)")
+        if not pad:
+            return False
+        middag = rc.naar_minuten(self.instellingen.waarden()["middag"]) or 12 * 60
+        try:
+            kolommen = uitvoer.lees_beschikbaarheid(pad, middag)
+        except Exception as e:  # noqa: BLE001
+            QMessageBox.critical(self, "Kan overzicht niet lezen", f"{pad}\n\n{e}")
+            return False
+        if not kolommen:
+            QMessageBox.warning(self, "Geen datums gevonden", "Het overzicht heeft geen kolommen met simucliënten.")
+            return False
+        dlg = SimuImport(kolommen, self.toetsdatum(), self)
+        if not (kies(dlg) if kies else dlg.exec()):
+            return False
+        blad = self.instellingen.waarden()["blad_simu"]
+        nieuw = uitvoer.simu_blad_met(self.bladen.get(blad), dlg.gekozen_datum(), dlg.gekozen())
+        self.bladen[blad] = self.ingevoerd[blad] = nieuw
+        self.verouderd()
+        self.statusBar().showMessage(f"{len(dlg.gekozen())} simucliënt(en) voor {rc.datum_tekst(dlg.gekozen_datum())} in blad "
+                                     f"{blad} gezet. Maak het rooster opnieuw; ‘Excel opslaan’ bewaart het blad.")
+        return True
 
     def sjabloon(self, doel: str | None = None) -> str | None:
         if not doel:

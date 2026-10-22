@@ -68,7 +68,7 @@ def test_uitdraai_alleen_naam_lokaal_tijd():
     kop, *data = r["bladen"]["Uitdraai_Kans1"]
     assert kop == ["Naam", "Lokaal", "Tijd"] and len(data) == 12
     cellen = {str(c) for rij in data for c in rij}
-    assert not cellen & {"XY", "MM", "BB", "NN", "Ann", "Bram", "Cor", "Sanne", "Tom", "Uma", "Gesprek"}
+    assert not cellen & {"XY", "MM", "BB", "NN", "Ann", "Bram", "Cor", "Siem", "Tom", "Uma", "Gesprek"}
     assert not any("9000" in c for c in cellen)
     verwacht = {(" ".join(x for x in (r["Voornaam"], r["vv"], r["Achternaam"]) if x), r["Lokaal"],
                  f"{rc.datum_tekst(r['Datum'])} {rc.tijd_tekst(round(r['Tijd'] * 1440))}") for r in rijen(r, "Rooster_Kans1")}
@@ -89,9 +89,9 @@ def test_eerste_kans_schrijft_juiste_kolommen():
 def test_herkansing_andere_beoordelaar_en_casus():
     r, _ = plan("her")
     per = {x["Voornaam"]: x for x in rijen(r, "Rooster_Her")}
-    assert set(per) == {"Mila", "Noah"}
+    assert set(per) == {"Mila", "Otto"}
     assert per["Mila"]["Beoordelaar"] != "Ann" and per["Mila"]["Casus"] != "XY"
-    assert per["Noah"]["Beoordelaar"] != "Bram" and per["Noah"]["Casus"] != "MM"
+    assert per["Otto"]["Beoordelaar"] != "Bram" and per["Otto"]["Casus"] != "MM"
     assert "Studenten" not in r["bladen"]
 
 
@@ -134,7 +134,7 @@ def test_ontbrekende_instellingen_worden_aangemaakt():
         del b["Instellingen"]
     r, _ = plan(wijzig=zonder)
     assert r["bladen"]["Instellingen"] == rc.instellingen_matrix()
-    assert "geen pauze" in r["bladen"]["Meldingen"][1][1]
+    assert "pauzes 11:15-11:40, 13:00-13:55, 15:15-15:40" in r["bladen"]["Meldingen"][1][1]
 
 
 def test_tijden_als_tekst():
@@ -173,11 +173,11 @@ def test_namen_deels_vergelijken():
 
     def alleen_ann(b, deels):
         b["Beoordelaars"] = [b["Beoordelaars"][0]] + [x for x in b["Beoordelaars"][1:] if x[2] == "Ann"]
-        b["Studenten"][1][5] = "An"  # Anna
+        b["Studenten"][1][5] = "An"  # Abel
         met(deelnaam=deels)(b)
     for deels, verwacht in (("Ja", "NIET INGEROOSTERD"), ("Nee", "")):
         r, _ = plan(wijzig=lambda b: alleen_ann(b, deels))
-        assert next(x for x in rijen(r, "Rooster_Kans1") if x["Voornaam"] == "Anna")["bijzheden"] == verwacht
+        assert next(x for x in rijen(r, "Rooster_Kans1") if x["Voornaam"] == "Abel")["bijzheden"] == verwacht
 
 
 def test_herkansing_verplicht_andere_beoordelaar():
