@@ -1,141 +1,126 @@
-# Roosterregels (eerste kans en herkansing)
+# Hoe het rooster gemaakt wordt
 
-De Office Scripts en de desktop-app gebruiken exact dezelfde regels. De tests controleren dat beide dezelfde uitvoer geven.
+Het programma en de scripts in Excel Online volgen precies dezelfde regels. Hieronder staat hoe het werkt.
 
-## Werkwijze in het kort
+## De dag
 
-Je vult drie dingen in. Het programma maakt de rest.
+Het programma maakt de tijden van de dag zelf, uit de instellingen: begintijd, eindtijd, toetsduur, wisseltijd en pauzes. Standaard begint er elke 20 minuten een student (15 minuten toets en 5 minuten wissel), van 09:40 tot 17:00, met pauzes om 11:15, 13:00 en 15:15. Dat zijn 17 plekken per lokaal.
 
-1. **Studenten**: één rij per student. Kolommen worden op kopnaam gevonden. Ook de namen uit het echte bestand werken (*Roepnaam*, *Klas p2*, *Niet inroosteren bij SB-docent P2*). Optioneel:
-   - *TTV* (Ja);
-   - *Voorkeur* (Ochtend / Middag / Vroeg / Laat);
-   - *Opmerkingen*;
-   - *IsHerkanser* (Ja).
-2. **Toetsdag_Kans1** / **Toetsdag_Her**: één rij per lokaal per toetsdag, met deze kolommen:
-   - *Datum*, *Lokaal*, *Casus*;
-   - *Casus na pauze* (optioneel), *Vaardigheid*, *Beoordelaar*;
-   - *Beoordelaar 2* en *Wissel om* (optioneel), voor een wissel halverwege de dag. Bijvoorbeeld: Huub tot 12:25, daarna Gerdien.
-3. **Simu**: één rij per simucliënt per toetsdag: *Datum*, *simucliënt*, en optioneel *Vanaf*, *Tot*, *Vast lokaal* en *Kan spelen*. Een lege datum betekent elke dag. In de app vul je dit blad met **Simu's importeren…** vanuit het overzicht *Beschikbaarheid simu's*.
+Een gewone toets valt nooit in een pauze. Een toets met TTV mag doorlopen in de pauze die erna komt.
 
-Uit de instellingen (eerste toets, laatste toets, toetsduur, wisseltijd en pauzes) maakt het programma alle slots. Met de standaardwaarden is dat elke 20 minuten een student (15 min toets + 5 min wissel): 09:40–11:15, 11:45–13:00, 14:00–15:15 en 15:45–17:00. Dat zijn 17 slots per lokaal, net als op de echte toetsdag van 14 april.
+De toetsduur was eerst 10 minuten. Die is aangepast aan het echte rooster. Dat de TTV-toets 20 minuten duurt, is een aanname. Controleer die.
 
-> **Standaard toetsduur gewijzigd:** van 10/15 naar **15 min, TTV 20 min**. De eerdere keuze kwam uit de oude testwerkmap, met slots per 10 minuten. Het echte rooster (M1.6 kans 1) gebruikt 15 minuten toets plus 5 minuten wissel. Pas het per toets aan bij Instellingen. De TTV-duur van 20 minuten is een aanname; controleer die.
+## Lokalen en beoordelaars
 
-**Of: conceptblad (lijstvorm).** Zo schrijf je het ook op papier op. In kolom A staan kopjes, in kolom B de waarden eronder (één per rij):
+Elke rij in het blad Toetsdag is een lokaal op een dag, met een casus, een vaardigheid en een of meer beoordelaars. De beoordelaar en de casus blijven de hele dag in dat lokaal.
 
-| A | B |
-|---|---|
-| datum | 15-12-2026 |
-| inzet | Ann de Bruin |
-| | … (één naam per rij) |
-| | Fien ochtend tot 13.00 |
-| | Hans middag vanaf 13.30 uur |
-| | Ida Klaproos (reactie nog afwachten) |
-| tijden | 10.00 - 10.15 |
-| | 10.20 - 10.35 … |
-| pauzes | 11.15-11.40 … |
-| lokalen | A1 … |
-| casussen | K1 man … (in dezelfde volgorde als de lokalen) |
-| simu's | 7 x |
-| studenten | (optioneel: één naam per rij, als er geen blad Studenten is) |
-
-Zo wordt het gelezen:
-
-- **Lokalen en casussen** worden op volgorde gekoppeld. Optioneel zijn er ook *vaardigheden* en *casussen na pauze*.
-- **Inzet:**
-  - Een gewone naam krijgt een lokaal voor de hele dag, in de volgorde van de lijst.
-  - *ochtend/tot …* en *middag/vanaf …* vormen samen één lokaal, waarbij de tweede het na die tijd overneemt.
-  - Een naam met een opmerking tussen haakjes is reserve. Een reserve wordt alleen ingezet als er anders te weinig beoordelaars zijn.
-- **Tijden:** precies de tijden uit de lijst worden gebruikt. Dubbele tijden tellen één keer, met een melding. De toetsduur komt uit de tijden (10.00 - 10.15 = 15 min).
-- **Tijden en pauzes** uit het concept gaan voor de instellingen.
-- **"simu's: 7 x":** de eerste 7 simu's voor die datum uit het blad Simu worden gebruikt; de rest is reserve.
-
-Staat er een conceptblad in de werkmap, dan gaat het voor het blad Toetsdag. Dat staat dan ook als melding bij Meldingen. In de app zet **Concept laden…** het concept uit een ander bestand in de open werkmap. Bij *Excel opslaan* wordt het bewaard als blad *Concept*.
-
-**Oude werkwijze:** is het blad Toetsdag leeg en bestaat *Slots_Kans1* / *Slots_Her* (één rij per begintijd), dan worden de oude bladen gebruikt, samen met *Beoordelaars*. Een *Simu*-blad met een kolom *Tijd* wordt ook nog gelezen als één rij per slot.
-
-## Beoordelaars die niet de hele dag kunnen, of ruilen
-
-In het blad Toetsdag heeft elke beoordelaar eigen kolommen **Van** en **Tot**. Leeg betekent vanaf het begin of tot het eind van de dag. Voor meer beoordelaars in één lokaal voeg je *Beoordelaar 2* / *Van 2* / *Tot 2* toe, dan *Beoordelaar 3* / *Van 3* / *Tot 3*, enzovoort. Per toets neemt het lokaal de eerste beoordelaar die dan kan, en de toets moet binnen zijn of haar tijd passen.
+Bij elke beoordelaar horen de kolommen Van en Tot. Leeg betekent de hele dag. Komen er meer beoordelaars in één lokaal, dan gebruik je Beoordelaar 2 met Van 2 en Tot 2, enzovoort. Per toets kiest het programma de eerste beoordelaar die dan de hele toets kan doen.
 
 | Lokaal | Beoordelaar | Van | Tot | Beoordelaar 2 | Van 2 | Tot 2 |
 |---|---|---|---|---|---|---|
 | C1.39 | Fien | | 13:00 | Hans | 13:30 | |
 | A | Ann | | 13:00 | Bram | 13:00 | |
 | B | Bram | | 13:00 | Ann | 13:00 | |
-| C | Dorus | 10:00 | 12:00 | | | |
 
-- In het voorbeeld ruilen **Ann en Bram** om 13:00 van lokaal. Staat iemand op dezelfde tijd in twee lokalen, dan volgt een waarschuwing.
-- Een ongeldige tijd, of een *Van* na *Tot*, geeft een fout met het rijnummer.
-- Dit werkt ook nog, maar de kolommen gaan voor:
-  - een tijd in de cel zelf (`Fien tot 13.00`, `Hans vanaf 13.30`, `Dorus 10.00-12.00`);
-  - **Wissel om**: beoordelaar 1 tot die tijd, beoordelaar 2 vanaf die tijd.
-- In het **conceptblad** (lijstvorm) zet je de tijd achter de naam bij *inzet*. Wie maar een deel van de dag kan, komt op tijdvolgorde samen in één lokaal (bijv. `Eef 10.00-12.00` → `Dorus van 12.00 tot 15.20` → `Lot vanaf 15.20`).
+In dit voorbeeld neemt Hans na de lunch het over van Fien. Ann en Bram ruilen om 13:00 van lokaal. Staat iemand op hetzelfde moment in twee lokalen, dan krijg je een melding.
 
-**Lokalen vullen** (instelling):
+Oudere werkmappen blijven werken. Een tijd in de naam zelf (Fien tot 13.00) of de kolom Wissel om wordt nog gelezen. De kolommen Van en Tot gaan voor.
 
-- **Evenredig** (standaard): op elk tijdstip gaat het lokaal met de minste studenten voor. Zo doet elk lokaal en elke beoordelaar mee, ook als er minder simu's dan lokalen zijn.
-- **Op volgorde:** eerst de bovenste lokalen.
+Een casus kan een speciaal lokaal nodig hebben, zoals een keuken. Zet dat tussen haakjes achter het lokaal en de casus, bijvoorbeeld C1.36 (keuken) en K3 vrouw (keuken). Het programma zet de casus, samen met de beoordelaar, dan in een lokaal dat past. Lukt dat niet, dan krijg je een melding. De woorden tussen haakjes staan niet in het rooster.
 
-Een lokaal dat de hele dag niemand kan krijgen, staat met naam, beoordelaars en reden bij Meldingen.
+Lokalen vullen: standaard krijgt op elk moment het lokaal met de minste studenten voorrang. Zo komt elke beoordelaar aan de beurt, ook als er minder simu's dan lokalen zijn. Krijgt een lokaal de hele dag niemand, dan staat bij Meldingen welk lokaal en waarom.
 
-## Kenmerken: casus die een bepaald lokaal nodig heeft
+## Simu's
 
-Zet kenmerken tussen haakjes achter het lokaal en achter de casus. Dat kan in het blad Toetsdag en in het conceptblad:
+In het blad Simu staat per dag wie er is, eventueel met een begin- en eindtijd. Het programma gebruikt een simu alleen als die er de hele toets is.
 
-- lokaal `C1.36 (keuken)`, `Praktijkhuis (keuken, tillift)`;
-- casus `K3 vrouw (keuken)`.
+Zodat simu's niet de hele dag dezelfde casus spelen, wisselen ze van lokaal. Bij de instellingen kies je wanneer: na elke pauze (standaard), na elke toets, of nooit.
 
-Zo wordt het verwerkt:
+Per simu kun je twee dingen instellen, in het blad Simu of met de knop Simucliënten in het programma:
+- Vast lokaal: leeg betekent dat de simu meewisselt. Ja betekent dat de simu in één lokaal blijft. Je kunt ook een lokaalnaam invullen.
+- Kan spelen: welke casussen de simu kan spelen, bijvoorbeeld vrouw, of P1, P2. Het woord moet als heel woord in de naam van de casus staan. Leeg betekent alles.
 
-- Een casus die een kenmerk vraagt, gaat met zijn beoordelaar en vaardigheid naar een lokaal dat die kenmerken heeft.
-  - De casus met de minste mogelijke lokalen gaat eerst.
-  - Staat de casus al in een passend lokaal, dan blijft hij daar.
-- De andere casussen vullen de overige lokalen op volgorde.
-- Elke verschuiving staat bij Meldingen. Is er geen passend lokaal vrij, dan volgt een waarschuwing.
-- De kenmerken zelf staan niet in het rooster of de PDF's.
-- Ook *Casus na pauze* kan een kenmerk vragen. Het lokaal ligt dan al vast, dus dat wordt alleen gecontroleerd.
+Je krijgt een melding bij te weinig simu's, bij een naam die twee keer voorkomt, bij een dag zonder simu's, of als niemand een casus kan spelen.
 
-## Kan spelen: welke simu welke casus speelt
+## Studenten
 
-Kolom *Kan spelen* in het blad Simu, of in de app via **Simucliënten…**:
+Het programma zoekt de kolommen op hun naam. De namen uit het bestaande bestand werken ook, zoals Roepnaam en Klas p2.
 
-- leeg betekent alle casussen;
-- anders een of meer woorden of casusnamen, gescheiden door `,` `;` of `/`, bijvoorbeeld `vrouw` of `P1, P2`. Een woord moet als heel woord in de casusnaam staan: `vrouw` past op *P3 vrouw*, `P1` niet op *P10*.
+- Niet inroosteren bij: die beoordelaars krijgt de student niet. Meerdere namen scheid je met een komma, puntkomma of schuine streep.
+- TTV: de student krijgt meer tijd en komt bij voorkeur vlak voor een pauze. Dan valt de extra tijd in de pauze.
+- Voorkeur: Ochtend, Middag, Vroeg of Laat. Lukt een ochtend- of middagwens niet, dan krijg je een melding.
+- Opmerkingen: woorden als ttv, ochtend en middag worden herkend. Elke opmerking staat bij Meldingen, zodat je kunt controleren of hij goed gelezen is. De hele tekst komt ook in het rooster.
 
-Zo wordt het verwerkt:
+Volgorde: eerst de studenten met TTV, dan die met een voorkeur, dan de rest. Een student zonder plek verdwijnt nooit. Hij staat onderaan het rooster als NIET INGEROOSTERD.
 
-- Simu's wisselen alleen naar lokalen met een casus die ze kunnen spelen.
-- Een waarschuwing volgt als niemand van die dag een casus kan spelen.
-- Een waarschuwing volgt ook als een vaste simu de casus van zijn lokaal niet kan spelen.
+## Eerste kans en herkansing
 
-## Uitvoer
+De eerste kans roostert iedereen in die geen herkanser is. Daarna schrijft het programma in het blad Studenten op wanneer en bij wie elke student was.
 
-- **Rooster_Kans1 / Rooster_Her**: het volledige rooster voor de organisatie. Lege, bruikbare plekken staan erin als **Vrije plek**, met lokaal, casus, beoordelaar en simucliënt. Dat kun je uitzetten.
-- **Uitdraai_Kans1 / Uitdraai_Her**: alleen naam, lokaal en tijd, om te publiceren. Hier staan nooit vrije plekken in.
-- **Meldingen**: telling, waarschuwingen en fouten, plus elke opmerking uit *Opmerkingen*, met hoe die is gelezen. Controleer die opmerkingen altijd.
-- **App: PDF voor docenten** (per lokaal per dag een pagina) en **PDF voor studenten**. In geen van beide staan vrije plekken.
+De herkansing roostert alleen de herkansers in. Het programma probeert dan een andere beoordelaar en een andere casus te kiezen dan bij de eerste kans. Bij de instellingen kies je of dat een voorkeur is of verplicht.
 
-## Feedback → hoe het nu werkt
+## Toetsdag als lijst
 
-| Feedback | Uitwerking |
+In plaats van het blad Toetsdag kun je de dag ook als lijst opschrijven: in kolom A een kopje, in kolom B de waarden eronder.
+
+| A | B |
 |---|---|
-| Casus vóór de pauze, een andere erna | Kolom **Casus na pauze** in het blad Toetsdag, plus de instelling *Casus na pauze*: na pauze 1, 2 of 3, of afwisselend na elke pauze. Een waarschuwing volgt als beide casussen gelijk zijn. |
-| Uitdraai voor studenten zonder studentnummer, casus etc. | Bladen **Uitdraai_*** en de PDF voor studenten: alleen naam, lokaal en tijd. |
-| TTV | *TTV* = Ja, of 'ttv' in *Opmerkingen*. De student krijgt de TTV-duur en komt bij voorkeur in het **laatste slot vóór een pauze**, zodat de extra tijd in de pauze valt. |
-| Jaar 2 tijd anders | Instelling **Jaar** kiest welke toetsduur geldt. Per jaar is er een gewone duur en een TTV-duur. |
-| 30 voor 45 min toets | Nog niet eenduidig. Alle duren zijn instelbaar; de standaard volgt het echte rooster (15 + 5 min). |
-| Lokaal + casus | Het rooster staat per datum → lokaal → tijd. Per lokaal staan de casus en de vaardigheid erbij. |
+| datum | 15-12-2026 |
+| inzet | Ann |
+| | Fien ochtend tot 13.00 |
+| | Hans middag vanaf 13.30 |
+| | Ida (reactie nog afwachten) |
+| tijden | 10.00 - 10.15 |
+| | 10.20 - 10.35 |
+| pauzes | 11.15-11.40 |
+| lokalen | A1 |
+| casussen | K1 man |
+| simu's | 7 x |
 
-## Instellingen
+Zo wordt het gelezen:
+- Lokalen en casussen horen in dezelfde volgorde bij elkaar.
+- Iemand die de hele dag kan, krijgt een eigen lokaal.
+- Mensen die alleen een deel van de dag kunnen, delen een lokaal, in volgorde van tijd.
+- Iemand met een opmerking tussen haakjes is reserve. Een reserve wordt alleen ingezet als er te weinig beoordelaars zijn.
+- De tijden en pauzes uit de lijst gaan voor de instellingen.
+- Bij 7 x worden de eerste zeven simu's van die dag gebruikt.
 
-Alle instellingen staan in het blad **Instellingen** en in de app op de pagina *Instellingen*. Beide gebruiken dezelfde lijst (`INSTELLINGEN` in `app/rooster_core.py`); `tools/bouw_scripts.py` zet die lijst ook in de Office Scripts.
+Staat zo'n lijst in de werkmap, dan gaat die voor het blad Toetsdag. In het programma haal je een lijst uit een ander bestand binnen met Concept laden.
 
-- Ontbreekt een rij, dan wordt die aangevuld met de standaardwaarde.
-- Een ongeldige waarde geeft een fout op het blad Meldingen. Het rooster blijft dan ongewijzigd.
+## Datums
+
+Datums mogen op veel manieren, bijvoorbeeld 14-04-2026, 14-4-26, 2026-04-14 of 14 april 2026. Een datum zonder jaartal wordt niet geaccepteerd.
+
+## Fouten en meldingen
+
+Eerst wordt alles gecontroleerd. Bij een fout blijft het rooster ongewijzigd en staat bij Meldingen wat er mis is. Voorbeelden:
+- een blad of kolom ontbreekt;
+- een lokaal staat twee keer op dezelfde dag;
+- een tijd klopt niet, of Van ligt na Tot;
+- een datum heeft geen jaartal.
+
+Meldingen die geen fout zijn, zoals een simu die twee keer voorkomt, staan er ook. Het rooster wordt dan wel gemaakt.
+
+## Wat je terugkrijgt
+
+- Het volledige rooster, met lege plekken als Vrije plek.
+- Een uitdraai voor studenten, met alleen naam, lokaal en tijd.
+- De meldingen.
+- In het programma ook een pdf voor docenten (een pagina per lokaal) en een pdf voor studenten. Vrije plekken staan niet in de uitdraai en niet in de pdf's.
+
+## Wat het nog niet kan
+
+- De pauzes gelden voor alle dagen en alle lokalen.
+- Een lijst (concept) zegt niet of het om de eerste kans of de herkansing gaat. Hij geldt voor wat je kiest.
+- Woorden tussen haakjes (zoals keuken) en Kan spelen moeten hetzelfde gespeld zijn. Hoofdletters tellen niet mee.
+- Het Word-overzicht van de opleiding wordt niet ingelezen.
+
+## Alle instellingen
+
+Deze staan in het blad Instellingen en op de pagina Instellingen in het programma. Ontbreekt een regel, dan vult het programma die aan met de standaardwaarde.
 
 <!-- tabel: gegenereerd uit rooster_core.INSTELLINGEN -->
-| Groep | Instelling | Standaard | Wat het doet |
+| Groep | Instelling | Standaard | Uitleg |
 |---|---|---|---|
 | Toetsdag | Eerste toets om | 09:40 | Begintijd van de eerste student. |
 | Toetsdag | Laatste toets klaar om | 17:00 | Geen toets loopt later door dan deze tijd. |
@@ -171,57 +156,3 @@ Alle instellingen staan in het blad **Instellingen** en in de app op de pagina *
 | Bladnamen | Blad uitdraai eerste kans | Uitdraai_Kans1 | Naam van het blad. |
 | Bladnamen | Blad uitdraai herkansing | Uitdraai_Her | Naam van het blad. |
 | Bladnamen | Blad meldingen | Meldingen | Naam van het blad. |
-
-## Planningsregels
-
-1. **Slots.** Per rij in het blad Toetsdag komt er een slot op elke begintijd. Een gewone toets raakt nooit een pauze en loopt nooit na *Laatste toets klaar om*.
-2. **Beoordelaar.** Per lokaal staat de beoordelaar uit het blad Toetsdag. Na *Wissel om* is dat *Beoordelaar 2*.
-3. **Simucliënten** komen uit het blad Simu, voor die datum. Per slot wordt alleen gebruikt wie dan volgens *Vanaf*/*Tot* beschikbaar is.
-   - Met *Simu's wisselen van lokaal* = **Na elke pauze** krijgt lokaal *k* simu *(k + aantal pauzes) mod n*.
-   - Met **Na elke toets** krijgt lokaal *k* simu *(k + hoeveelste tijd van de dag) mod n*, zodat elke simu na iedere toets een lokaal doorschuift en niet de hele dag bij dezelfde toets zit.
-   - Met **Nee** blijft iedere simu in hetzelfde lokaal.
-
-   De beoordelaar en de casus blijven de hele dag in hun lokaal. Alleen de simu's schuiven door, zodat ze niet steeds dezelfde casus spelen.
-
-   **Per simu** kan dat anders, via de kolom *Vast lokaal* in het blad Simu (of in de app met **Simucliënten…**):
-   - leeg: wisselt mee volgens de instelling;
-   - *Ja*: blijft de hele dag in één lokaal (het eerste lokaal dat nog vrij is);
-   - een lokaalnaam, bijvoorbeeld *C1.39*: blijft altijd in dat lokaal.
-
-   De andere simu's wisselen dan alleen tussen de overige lokalen. Een onbekend of al bezet lokaal geeft een waarschuwing; die simu wisselt dan gewoon mee.
-
-   Er volgt een waarschuwing:
-   - bij minder simu's dan lokalen;
-   - bij een dubbele naam;
-   - bij een dag zonder simu's.
-4. **Uitsluitingen.** Beoordelaars in *Niet inroosteren bij …* worden voor die student overgeslagen. Namen scheid je met `,` `;` of `/` (bijvoorbeeld `Floor/Huub`). Met *Namen deels vergelijken* telt een deel van de naam ook.
-5. **Volgorde:**
-   - eerst TTV-studenten;
-   - dan studenten met een voorkeur;
-   - dan de rest, in de volgorde van het blad Studenten.
-
-   Plaatsing:
-   - TTV: het slot dat het dichtst vóór een pauze begint.
-   - *Ochtend*: het vroegste slot vóór *Middag begint om*.
-   - *Middag*: het vroegste slot daarna.
-   - *Vroeg*: het vroegste slot.
-   - *Laat*: het laatste slot.
-
-   Een gemiste ochtend- of middagwens geeft een waarschuwing.
-6. **TTV-toets.** Mag doorlopen in de pauze direct erna.
-7. **Opmerkingen.** De woorden *ttv*, *ochtend*, *middag*, *vroeg* en *laat* worden herkend. Elke opmerking staat op Meldingen om te controleren, en de volledige tekst staat in *bijzheden*.
-8. **Eerste kans** roostert iedereen met `IsHerkanser` ≠ `Ja` in. Daarna schrijft het `EersteDatum`, `EersteTijd`, `EersteBeoordelaar` en `EersteCasus` terug in het blad Studenten.
-9. **Herkansing** roostert alleen `IsHerkanser` = `Ja` in. Een andere beoordelaar en een andere casus dan bij de eerste kans kun je instellen als *Voorkeur*, *Verplicht* of *Maakt niet uit*.
-10. **Niemand verdwijnt.** Wie niet past, staat onderaan het rooster met `NIET INGEROOSTERD` en op Meldingen.
-11. **Eerst controleren.** Bij een fout blijft het rooster ongewijzigd. Voorbeelden van fouten:
-   - een ontbrekend blad of een ontbrekende kolom;
-   - een dubbel lokaal;
-   - *Beoordelaar 2* zonder *Wissel om*;
-   - een ongeldige tijd of pauze.
-
-## Bekende beperkingen
-
-- De pauzes gelden voor alle dagen en alle lokalen.
-- Een simucliënt rouleert per blok en alleen als hij het hele blok beschikbaar is (*Vanaf*/*Tot*).
-- Simu's met '?' in het beschikbaarheidsoverzicht worden bij importeren niet vooraf aangevinkt.
-- Het Word-bestand *Overzichtslijst* wordt niet ingelezen. Het is alleen naslag; de bevestigde simu's staan ook in het beschikbaarheidsoverzicht.

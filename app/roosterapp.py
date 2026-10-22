@@ -25,47 +25,32 @@ from onderdelen import InstellingenFormulier, Segment, SimuImport, SimuVast, Sta
 from thema import KLEUR
 
 HULP = """
-<style>li { margin-bottom: 6px; } h3 { margin-top: 18px; }</style><h3>Zo maak je een rooster</h3>
+<style>li { margin-bottom: 6px; } h3 { margin-top: 18px; }</style>
+<h3>Zo maak je een rooster</h3>
 <ol>
-<li><b>Vul de werkmap.</b> Begin met <i>Nieuw sjabloon…</i> in de zijbalk, of gebruik de werkmap van vorige keer:
+<li>Vul de werkmap. Nog geen werkmap? Kies Nieuw sjabloon in de zijbalk.
   <ul>
-  <li><b>Studenten</b> — één rij per student. <i>TTV</i> = Ja voor tijdverlenging, <i>Voorkeur</i> = Ochtend/Middag/Vroeg/Laat,
-      <i>IsHerkanser</i> = Ja voor de herkansing. In <i>Niet inroosteren bij …</i> zet je docenten die deze student niet mogen
-      beoordelen (scheiden met , ; of /). Tekst in <i>Opmerkingen</i> zoals ‘ttv bij uitvoering’ of ‘graag in de ochtend’
-      wordt herkend en staat bij Meldingen om te controleren.</li>
-  <li><b>Toetsdag_Kans1 / Toetsdag_Her</b> — één rij per lokaal per toetsdag: datum, lokaal, casus (en eventueel
-      <i>Casus na pauze</i>), vaardigheid en beoordelaar. Kan iemand niet de hele dag? Vul <i>Van</i> en <i>Tot</i> in
-      (leeg = de hele dag). Lossen ze elkaar af, gebruik dan <i>Beoordelaar 2</i> met <i>Van 2</i>/<i>Tot 2</i>, enzovoort.
-      Ruilen kan ook: lokaal A Ann tot 13:00 en Bram vanaf 13:00, lokaal B andersom.</li>
-  <li><b>Of in lijstvorm</b> — één blad met in kolom A de kopjes <i>datum, inzet, tijden, pauzes, lokalen, casussen, simu's</i>
-      en in kolom B de waarden eronder, zoals je het opschrijft. Uit een ander bestand: <i>Concept laden…</i> in de zijbalk.
-      ‘ochtend tot 13.00’ en ‘middag vanaf 13.30’ delen een lokaal; een naam met (opmerking) is reserve.</li>
-  <li><b>Simu</b> — één rij per simucliënt per toetsdag, eventueel met <i>Vanaf</i>/<i>Tot</i>.
-      Sneller: <i>Simu's importeren…</i> in de zijbalk neemt ze over uit het overzicht ‘Beschikbaarheid simu's’.
-      Met <i>Simucliënten…</i> kies je per simu of hij van lokaal wisselt (standaard) of vast in één lokaal blijft
-      (kolom <i>Vast lokaal</i>), en welke casussen hij kan spelen (<i>Kan spelen</i>, bijv. ‘vrouw’).</li>
-  <li><b>Speciaal lokaal nodig</b>, zoals een keuken? Zet kenmerken tussen haakjes: lokaal ‘C1.36 (keuken)’ en casus
-      ‘K3 vrouw (keuken)’. De casus gaat dan met zijn beoordelaar naar een passend lokaal.</li>
+  <li>Studenten: één rij per student. Vul eventueel TTV, Voorkeur, Opmerkingen en IsHerkanser in.
+      Bij Niet inroosteren bij zet je de docenten die een student niet mag krijgen.</li>
+  <li>Toetsdag: één rij per lokaal, met casus, vaardigheid en beoordelaar. Met Van en Tot geef je aan wanneer
+      iemand er is. Lossen beoordelaars elkaar af, gebruik dan ook Beoordelaar 2 met Van 2 en Tot 2.</li>
+  <li>Simu: één rij per simu per dag. Je kunt ze ook overnemen met Simu's importeren.
+      Met Simucliënten stel je per simu een vast lokaal en Kan spelen in.</li>
+  <li>Een casus die een keuken nodig heeft? Zet het tussen haakjes, bijvoorbeeld C1.36 (keuken) en K3 (keuken).</li>
+  <li>Liever een lijst, zoals op papier? Dat kan ook. Haal die binnen met Concept laden.</li>
   </ul></li>
-<li><b>Open de werkmap</b> hier (download hem eerst uit OneDrive/SharePoint).</li>
-<li>Controleer de <b>instellingen</b>: eerste en laatste toets, toetsduur, wisseltijd en pauzes. Daaruit worden alle
-  tijdslots gemaakt (standaard elke 20 minuten van 09:40 tot 17:00, met drie pauzes). Bij <i>Simu's wisselen van lokaal</i> kies je of simu's na elke pauze of na elke toets een lokaal doorschuiven.</li>
-<li>Kies <b>Eerste kans</b> of <b>Herkansing</b> en klik op <b>Rooster maken</b>.
-  Kijk bij <i>Meldingen</i> of iedereen een plek heeft en of de opmerkingen goed zijn gelezen.</li>
-<li><b>Exporteer</b>:
-  <ul>
-  <li><b>Excel opslaan</b> — een nieuwe werkmap met het rooster (inclusief grijze <i>Vrije plek</i>-rijen), de uitdraai en de meldingen.</li>
-  <li><b>PDF voor docenten</b> — per lokaal en dag een pagina om op te hangen, zonder vrije plekken.</li>
-  <li><b>PDF voor studenten</b> — alleen naam, lokaal en tijd; geschikt om te publiceren.</li>
-  </ul></li>
+<li>Open de werkmap. Download hem eerst uit OneDrive of SharePoint.</li>
+<li>Kijk de instellingen na: tijden, toetsduur, pauzes en wanneer simu's van lokaal wisselen.</li>
+<li>Kies Eerste kans of Herkansing en klik op Rooster maken. Kijk daarna bij Meldingen.</li>
+<li>Sla op als Excel, of maak een pdf voor docenten of voor studenten. Je originele bestand blijft ongewijzigd.</li>
 </ol>
-<h3>Liever in Excel Online?</h3>
-<p>De knoppen op het eerste blad van de werkmap doen hetzelfde (zie de README op GitHub). Ze gebruiken het blad
-<i>Instellingen</i>; de app schrijft jouw instellingen daarin bij <i>Excel opslaan</i>.</p>
-<h3>Iets klopt niet?</h3>
-<p>Studenten die niet passen staan onderaan het rooster als <i>NIET INGEROOSTERD</i> en in <i>Meldingen</i>.
-Meestal zijn er te weinig plekken, sluiten de uitsluitingen alle beoordelaars van een student uit, of zijn er te weinig
-simucliënten in een blok. Pas de werkmap of de instellingen aan en maak het rooster opnieuw.</p>
+<h3>Excel Online</h3>
+<p>De knoppen in de werkmap doen hetzelfde. Ze gebruiken het blad Instellingen. Het programma zet jouw instellingen
+daarin als je opslaat als Excel. Meer uitleg staat in de README op GitHub.</p>
+<h3>Klopt er iets niet?</h3>
+<p>Een student zonder plek staat onderaan het rooster als NIET INGEROOSTERD. Bij Meldingen staat waarom.
+Vaak zijn er te weinig plekken of simu's, of sluiten de uitsluitingen alle beoordelaars uit. Krijgt een heel lokaal
+niemand, dan staat bij Meldingen welk lokaal en waarom. Let ook op namen die twee keer in het blad Simu staan.</p>
 """
 
 

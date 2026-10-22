@@ -1,134 +1,92 @@
-# OWB Toetsrooster
+# Toetsrooster
 
-Maakt het toetsrooster voor de **eerste kans** en de **herkansing**. Je vult drie dingen in:
+Dit programma maakt het rooster voor de vaardighedentoetsen, voor de eerste kans en de herkansing. Je vult de gegevens in en krijgt een kant-en-klaar rooster terug: een Excel-bestand, een pdf voor docenten en een pdf voor studenten.
 
-- de **studentenlijst**;
-- per toetsdag de **lokalen**, elk met een beoordelaar, casus en vaardigheid (blad *Toetsdag*);
-- de **simucliënten**.
+Je kunt het op twee manieren gebruiken. Ze werken precies hetzelfde.
 
-Alle tijdslots, de wisseling van simu's per blok en de vrije plekken worden berekend. Je krijgt een kant-en-klaar rooster terug, als Excel-werkmap en als PDF om te printen of te publiceren. Er is geen roostermaker meer nodig die het met de hand doet.
+1. In Excel Online, met de knoppen op het eerste blad van de werkmap.
+2. Met het programma Toetsrooster op je eigen computer. Dat is één bestand: dubbelklikken en het werkt. Je hoeft niets te installeren.
 
-Er zijn twee manieren, met precies dezelfde regels (zie [docs/REGELS.md](docs/REGELS.md)):
+De volledige regels staan in [docs/REGELS.md](docs/REGELS.md).
 
-1. **In Excel Online** met de knoppen op het eerste blad (Office Scripts, geen VBA).
-2. Met het **programma OWB-Toetsrooster**: één bestand, dubbelklikken, niets installeren.
+## Wat je invult
 
----
+Je werkt in een Excel-werkmap met deze bladen.
 
-## 1. Excel Online: scripts bijwerken (eenmalig)
+Studenten: één rij per student.
+- Kolommen: studentnummer, voornaam (of roepnaam), tussenvoegsel, achternaam, klas.
+- Bij wie de student niet mag: Niet inroosteren bij SB-docent, Niet inroosteren bij de vaardighedendocent. Meerdere namen scheid je met een komma of een schuine streep.
+- Optioneel: TTV (Ja), Voorkeur (Ochtend, Middag, Vroeg of Laat), Opmerkingen en IsHerkanser (Ja).
 
-De knoppen op het blad *Studenten* verwijzen naar de scripts in je OneDrive. Vervang de **inhoud** van die scripts. Maak geen nieuwe scripts aan, dan blijven de knoppen werken.
+Toetsdag_Kans1 en Toetsdag_Her: één rij per lokaal per toetsdag.
+- Kolommen: datum, lokaal, casus, vaardigheid, beoordelaar.
+- Van en Tot: wanneer de beoordelaar er is. Leeg betekent de hele dag.
+- Lossen beoordelaars elkaar af, of ruilen ze van lokaal? Gebruik dan ook Beoordelaar 2 met Van 2 en Tot 2, enzovoort.
+- Casus na pauze: een andere casus na de pauze (optioneel).
+- Heeft een casus een speciaal lokaal nodig, zoals een keuken? Zet het tussen haakjes achter het lokaal en de casus, bijvoorbeeld C1.36 (keuken) en K3 vrouw (keuken). Het programma zet die casus dan in het goede lokaal.
 
-1. Open de werkmap in Excel Online en ga naar **Automatiseren** → **Alle scripts**.
-2. Open **OWB Exam Roster Generator** en selecteer alle code (Ctrl+A).
-3. Plak de volledige inhoud van [`OWB Exam Roster Generator.txt`](OWB%20Exam%20Roster%20Generator.txt) en kies **Script opslaan**.
-4. Doe hetzelfde met **OWB Retake Exam Roster Generator** en [`OWB Retake Exam Roster Generator.txt`](OWB%20Retake%20Exam%20Roster%20Generator.txt).
-   - Bestaat dit script nog niet, maak het aan met precies deze naam.
-   - Koppel het daarna via **⋯ → Knop toevoegen** aan een knop.
-5. Klik op de knop **Run OWB Exam Roster Generator**.
+Simu: één rij per simulatiepatiënt per toetsdag.
+- Kolommen: datum, naam, en eventueel vanaf en tot.
+- Vast lokaal (optioneel): leeg betekent dat de simu meewisselt. Ja betekent dat de simu in één lokaal blijft. Je kunt ook een lokaalnaam invullen.
+- Kan spelen (optioneel): welke casussen iemand kan spelen, bijvoorbeeld vrouw, of P1, P2. Leeg betekent alles.
 
-### Wat je invult
+Instellingen: dit blad wordt vanzelf gemaakt. Hier staan onder andere:
+- de begin- en eindtijd, de toetsduur (standaard 15 minuten, met TTV 20) en de pauzes;
+- of simu's na elke pauze, na elke toets of nooit van lokaal wisselen;
+- of lokalen evenredig worden gevuld (standaard), zodat elke beoordelaar aan de beurt komt.
 
-| Blad | Eén rij per | Kolommen |
-|---|---|---|
-| **Studenten** | student | Studentnummer, Voornaam/Roepnaam, Tussenvoegsel, Achternaam, Klas, Niet inroosteren bij SB-docent, Niet inroosteren bij de vaardighedendocent, en optioneel TTV, Voorkeur, Opmerkingen en IsHerkanser |
-| **Toetsdag_Kans1** / **Toetsdag_Her** | lokaal per toetsdag | Datum, Lokaal, Casus, Casus na pauze, Vaardigheid, Beoordelaar, **Van**, **Tot**, en eventueel Beoordelaar 2 / Van 2 / Tot 2, Beoordelaar 3 / … voor wie elkaar aflossen of ruilen. Lege Van/Tot = de hele dag. |
-| **Simu** | simucliënt per toetsdag | Datum, simucliënt, Vanaf, Tot, en optioneel Vast lokaal (leeg = wisselt mee, Ja = blijft in één lokaal, of een lokaalnaam) en Kan spelen (bijv. `vrouw` of `P1, P2`; leeg = alles) |
+Liever een lijst, zoals je het op papier opschrijft? Dat kan ook. Zet in kolom A de kopjes datum, inzet, tijden, pauzes, lokalen, casussen en simu's, en in kolom B de waarden eronder. Zie [docs/REGELS.md](docs/REGELS.md).
 
-Heeft een casus een speciaal lokaal nodig, bijvoorbeeld een keuken? Zet dan kenmerken tussen haakjes: lokaal `C1.36 (keuken)` en casus `K3 vrouw (keuken)`. De casus gaat dan, met zijn beoordelaar, vanzelf naar een passend lokaal.
+## Wat je terugkrijgt
 
-De tijden van de dag (eerste toets, laatste toets, toetsduur, wisseltijd en pauzes) staan in het blad **Instellingen**. Ze zijn ingesteld zoals op de echte toetsdag: 15 min toets + 5 min wissel, van 09:40 tot 17:00, met pauzes om 11:15, 13:00 en 15:15.
+- Rooster_Kans1 en Rooster_Her: het volledige rooster, per lokaal en tijd. Lege plekken staan erin als Vrije plek.
+- Uitdraai_Kans1 en Uitdraai_Her: voor studenten, met alleen naam, lokaal en tijd.
+- Meldingen: hoeveel studenten zijn ingeroosterd, en wat aandacht nodig heeft. Bijvoorbeeld een student zonder plek, een lokaal dat niemand krijgt, of een opmerking die het programma heeft gelezen. Kijk hier altijd even naar.
+- In het programma ook een pdf voor docenten (per lokaal een pagina) en een pdf voor studenten. Vrije plekken staan daar niet op.
 
-**Of in lijstvorm:** zet één blad in de werkmap met in kolom A de kopjes *datum, inzet, tijden, pauzes, lokalen, casussen, simu's* en in kolom B de waarden eronder, zoals je het op papier zou opschrijven. Dat werkt ook in Excel Online. In de app kan het met **Concept laden…**. Zie [docs/REGELS.md](docs/REGELS.md).
+Gaat er iets mis in de invoer, zoals een ontbrekende kolom of een verkeerde tijd? Dan blijft het rooster ongewijzigd en staat bij Meldingen wat er mis is.
 
-De volledige regels staan in [docs/REGELS.md](docs/REGELS.md). Werkmappen met de oude bladen *Slots_Kans1*, *Slots_Her* en *Beoordelaars* (één rij per begintijd) werken ook nog, zolang het blad Toetsdag leeg is.
-
-### Wat er verandert in de werkmap
-
-- **Instellingen** (nieuw blad): dit blad wordt de eerste keer automatisch gemaakt. Je kunt onder andere instellen:
-  - begin en eind van de dag, wisseltijd en studiejaar;
-  - toetsduur per jaar: standaard 15 min, TTV 20 min. Dit was eerst 10/15; het is aangepast aan het echte rooster;
-  - pauzes en wanneer de casus wisselt;
-  - of simu's na elke pauze, na elke toets of nooit van lokaal wisselen. Beoordelaars en casussen blijven in hun lokaal; per simu kan een vast lokaal worden opgegeven;
-  - vrije plekken tonen;
-  - de grens tussen ochtend en middag voor voorkeuren;
-  - waar TTV-studenten komen;
-  - herkansingsregels (Voorkeur/Verplicht/Maakt niet uit);
-  - sortering en datum op de uitdraai;
-  - alle bladnamen.
-
-  Zie de tabel in [docs/REGELS.md](docs/REGELS.md#instellingen). De app schrijft zijn instellingen bij *Excel opslaan* naar hetzelfde blad, zodat de knoppen in Excel Online daarna dezelfde regels gebruiken.
-- **Rooster_Kans1 / Rooster_Her**:
-  - het volledige rooster voor de organisatie, gesorteerd op datum → lokaal → tijd;
-  - de kolommen *Lokaal*, *Casus* en *Eindtijd*;
-  - lege plekken als **Vrije plek**. Je hoeft die rijen niet meer handmatig weg te laten: ze staan nooit op de uitdraai of in de PDF's.
-- **Uitdraai_Kans1 / Uitdraai_Her** (nieuw): voor studenten, met **alleen naam, lokaal en tijd**. Er staat geen studentnummer, casus, beoordelaar of simucliënt op.
-- **Meldingen** (nieuw): hier staat hoeveel studenten zijn ingeroosterd. Ook waarschuwingen staan hier, zoals:
-  - studenten die niet passen;
-  - een herkanser die toch dezelfde beoordelaar heeft;
-  - fouten in de invoer;
-  - elke tekst uit *Opmerkingen*, met hoe die is gelezen (bijvoorbeeld 'ttv bij uitvoering' → TTV, 'graag in de ochtend' → voorkeur ochtend). Controleer die altijd.
-
-  Bij een fout blijft het rooster ongewijzigd.
-- **Studenten**: de eerste kans vult nu de juiste kolommen *EersteDatum*, *EersteTijd*, *EersteBeoordelaar* en *EersteCasus*.
-  - Het oude script schreef één kolom te vroeg, waardoor er datums in *IsHerkanser* stonden. Maak die cellen leeg en zet `Ja` bij de herkansers.
-  - Zolang dat niet is gebeurd, verschijnt er een waarschuwing.
-
-> Let op: vul bij **Toetsduur jaar 2** de echte tijd voor jaar 2 in. Standaard staat er 15/20 min, net als in jaar 1, omdat de juiste waarde voor jaar 2 niet bekend was.
-
----
-
-## 2. Programma OWB-Toetsrooster (Windows en Linux)
+## Het programma gebruiken
 
 ### Downloaden
 
-Op GitHub → **Actions** → laatste geslaagde run **Bouw programma's** → *Artifacts*:
+Ga op GitHub naar [Releases](../../releases/latest) en download bij de nieuwste versie:
+- Windows: OWB-Toetsrooster.exe
+- Linux: OWB-Toetsrooster-linux
+- om mee te oefenen: Voorbeeld-rooster.xlsx
 
-- **OWB-Toetsrooster-Windows**: `OWB-Toetsrooster.exe`
-- **OWB-Toetsrooster-Linux**: `OWB-Toetsrooster`
+Op Windows kan een waarschuwing verschijnen, omdat het programma niet ondertekend is. Kies dan Meer informatie en daarna Toch uitvoeren. Op Linux maak je het bestand eerst uitvoerbaar, via Eigenschappen of met `chmod +x OWB-Toetsrooster-linux`.
 
-Pak de zip uit. Er hoeft niets anders geïnstalleerd te worden: Python en Qt zitten in het bestand.
+### Stappen
 
-- **Windows**:
-  1. Dubbelklik op het bestand.
-  2. Waarschuwt SmartScreen, kies dan **Meer informatie → Toch uitvoeren**. Het programma is niet ondertekend.
-- **Linux**: maak het bestand eenmalig uitvoerbaar met *Eigenschappen → Uitvoerbaar*, of `chmod +x OWB-Toetsrooster`. Dubbelklik daarna.
-- Het eerste opstarten duurt een paar seconden, omdat het bestand zichzelf uitpakt.
+1. Nog geen werkmap? Kies Nieuw sjabloon. Je krijgt dan een lege werkmap met alle bladen en kolommen.
+2. Kies Werkmap openen en open je Excel-bestand. Download het eerst uit OneDrive of SharePoint.
+3. Staat de toetsdag in een lijst in een ander bestand? Kies Concept laden.
+4. Kies Simu's importeren om simu's over te nemen uit het overzicht Beschikbaarheid simu's. Met Simucliënten stel je per simu het vaste lokaal en Kan spelen in.
+5. Kijk de instellingen na.
+6. Kies Eerste kans of Herkansing en klik op Rooster maken.
+7. Sla het resultaat op als Excel of pdf. Je originele bestand blijft altijd ongewijzigd.
 
-### Gebruik
+De pagina Hulp in het programma legt hetzelfde uit.
 
-1. Nog geen werkmap? Klik in de zijbalk op **Nieuw sjabloon…**. Je krijgt dan een lege werkmap met de juiste bladen en kolommen om in te vullen.
-2. **Werkmap openen…**: kies het Excel-bestand. Download het eerst uit OneDrive/SharePoint.
-3. **Simu's importeren…** (zijbalk): kies het overzicht *Beschikbaarheid simu's*.
-   - De kolom van de toetsdag wordt vanzelf gekozen.
-   - Wie beschikbaar is, staat in de lijst; het aantal 'nodig' is alvast aangevinkt. Een '?' wordt niet aangevinkt.
-   - De gekozen simu's komen in het blad Simu en gaan mee bij *Excel opslaan*.
-   - Met **Simucliënten…** kies je per simu of hij van lokaal wisselt of vast in een lokaal blijft.
-4. Controleer de pagina **Instellingen**. Deze wordt gevuld vanuit het blad Instellingen van de werkmap. *Standaardwaarden* zet alles terug.
-5. Kies op de pagina **Rooster** voor **Eerste kans** of **Herkansing** en klik op **Rooster maken**.
-   - De kaarten tonen hoeveel studenten zijn ingeroosterd, hoeveel vrije plekken er over zijn, en of er waarschuwingen zijn of studenten zonder plek.
-   - Vrije plekken staan grijs in het rooster.
-   - Details staan op het tabblad *Meldingen*.
-6. Exporteer:
-   - **Excel opslaan…**: een **nieuw** bestand met het rooster, de uitdraai, de meldingen en de instellingen. Het origineel wordt nooit overschreven, zodat de scriptknoppen daarin intact blijven.
-   - **PDF voor docenten…**: per lokaal en dag een A4-pagina (liggend) met tijd, student, casus, beoordelaar en simucliënt. Zonder vrije plekken.
-   - **PDF voor studenten…**: alleen naam, lokaal en tijd, om te publiceren of op te hangen.
+## Excel Online
 
-De pagina **Hulp** in de app legt dezelfde stappen uit.
+De knoppen in de werkmap gebruiken twee scripts. Die werk je zo bij (eenmalig per nieuwe versie):
 
----
+1. Open de werkmap in Excel Online en ga naar Automatiseren, Alle scripts.
+2. Open OWB Exam Roster Generator, selecteer alle code en vervang die door de inhoud van [OWB Exam Roster Generator.txt](OWB%20Exam%20Roster%20Generator.txt). Sla op.
+3. Doe hetzelfde met OWB Retake Exam Roster Generator en [OWB Retake Exam Roster Generator.txt](OWB%20Retake%20Exam%20Roster%20Generator.txt).
+
+Maak geen nieuwe scripts aan, maar vervang de inhoud. Dan blijven de knoppen werken.
+
+Let op: de toetsduur voor jaar 2 staat standaard hetzelfde als jaar 1. Vul de juiste tijd in bij Instellingen.
 
 ## Voor ontwikkelaars
 
-- Opbouw van de app:
-  - `app/rooster_core.py`: logica en de lijst met instellingen;
-  - `app/uitvoer.py`: Excel, PDF en sjabloon;
-  - `app/thema.py`: kleuren en stijl, naar shadcn/ui *neutral*;
-  - `app/onderdelen.py`: UI-onderdelen, waaronder het instellingenformulier, dat zichzelf opbouwt uit de instellingenlijst;
-  - `app/roosterapp.py`: het venster.
-- Een nieuwe instelling voeg je toe in `INSTELLINGEN` in `rooster_core.py`. Gebruik haar daarna in `maak_rooster`, en in `officescripts/rooster.ts` via `txt("sleutel")`. Formulier, blad Instellingen en scripts volgen dan vanzelf.
-- De logica staat twee keer: in `app/rooster_core.py` (Python) en in `officescripts/rooster.ts` (Office Script). De tests controleren dat beide exact dezelfde uitvoer geven, ook bij afwijkende instellingen.
-- Na een wijziging in `rooster.ts` maak je de twee `.txt`-scripts opnieuw met `python tools/bouw_scripts.py`.
+- De logica staat in `app/rooster_core.py` en hetzelfde nog eens in `officescripts/rooster.ts` voor Excel Online. De tests controleren dat beide precies hetzelfde rooster maken.
+- Na een wijziging in `rooster.ts` maak je de scripts opnieuw met `python tools/bouw_scripts.py`.
+- Een nieuwe instelling voeg je toe aan `INSTELLINGEN` in `rooster_core.py`. Het formulier in het programma, het blad Instellingen en de scripts nemen haar vanzelf over.
+- Overige bestanden: `app/uitvoer.py` voor Excel, pdf, sjabloon en het beschikbaarheidsoverzicht, `app/onderdelen.py` en `app/thema.py` voor het scherm, en `app/roosterapp.py` voor het venster.
 - Testen:
 
   ```sh
@@ -137,7 +95,5 @@ De pagina **Hulp** in de app legt dezelfde stappen uit.
   QT_QPA_PLATFORM=offscreen pytest
   ```
 
-  - De Office Scripts worden gecontroleerd met TypeScript 4.0.3, de versie van Excel Online.
-  - Daarna draaien ze tegen een nagebootste werkmap.
-- Lokaal bouwen: `pip install pyinstaller && pyinstaller roosterapp.spec` maakt `dist/`. Bij een push naar `main` bouwt GitHub Actions automatisch voor Windows en Linux.
-- Zet **nooit** echte werkmappen met studentgegevens in deze repository. `.gitignore` laat alleen code en `voorbeeld/` toe. De voorbeeldwerkmap bevat verzonnen gegevens (`python tools/maak_voorbeeld.py`).
+- Bouwen: `pyinstaller roosterapp.spec`. Bij elke push naar `main` bouwt GitHub de versies voor Windows en Linux.
+- Zet nooit echte werkmappen met studentgegevens in deze repository. De voorbeeldwerkmap bevat verzonnen gegevens en wordt gemaakt met `python tools/maak_voorbeeld.py`.

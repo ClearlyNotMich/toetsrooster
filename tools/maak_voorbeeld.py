@@ -126,6 +126,21 @@ def voorbeeld_bladen() -> dict:
             "Rooster_Kans1": [rc.ROOSTER_KOP], "Rooster_Her": [rc.ROOSTER_KOP], "Instellingen": inst}
 
 
+def voorbeeld_werkmap() -> dict:
+    """De voorbeeldwerkmap zoals gebruikers hem zien: blad Toetsdag met Van/Tot per beoordelaar, blad Simu met de
+    kolommen Vast lokaal en Kan spelen (leeg). Zelfde rooster als dag_bladen()."""
+    b = dag_bladen()
+    kop = ["Datum", "Lokaal", "Casus", "Casus na pauze", "Vaardigheid", "Beoordelaar", "Van", "Tot",
+           "Beoordelaar 2", "Van 2", "Tot 2"]
+    for naam in ("Toetsdag_Kans1", "Toetsdag_Her"):
+        rijen = [kop]
+        for d, lokaal, casus, na, vaardig, b1, b2, wissel in b[naam][1:]:
+            rijen.append([d, lokaal, casus, na, vaardig, b1, "", wissel, b2, wissel, ""])
+        b[naam] = rijen
+    b["Simu"] = [b["Simu"][0] + ["Vast lokaal", "Kan spelen"]] + [r + ["", ""] for r in b["Simu"][1:]]
+    return b
+
+
 def schrijf(pad: Path, bladen: dict | None = None) -> None:
     from openpyxl import Workbook
     wb = Workbook()
@@ -136,5 +151,5 @@ def schrijf(pad: Path, bladen: dict | None = None) -> None:
 
 if __name__ == "__main__":
     doel = Path(__file__).resolve().parents[1] / "voorbeeld" / "Voorbeeld rooster.xlsx"
-    schrijf(doel)
+    schrijf(doel, voorbeeld_werkmap())
     print(doel)

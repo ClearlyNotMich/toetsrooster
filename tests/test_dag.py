@@ -546,3 +546,11 @@ def test_kolommen_van_tot_fouten():
     assert any("bij Fien ligt 'van' (14:00) niet vóór 'tot' (13:00)" in f for f in r["fouten"])
     r = plan(wijzig=dag_kolommen([T, "A", "Q 1", "COPM", "Fien", "", "", "Hans", "", ""]))
     assert any("vul 'Van'/'Tot' per beoordelaar in" in f for f in r["fouten"])
+
+
+def test_voorbeeldwerkmap_met_nieuwe_kolommen_geeft_zelfde_rooster():
+    nieuw, oud = mv.voorbeeld_werkmap(), mv.dag_bladen()
+    assert nieuw["Toetsdag_Kans1"][0][5:8] == ["Beoordelaar", "Van", "Tot"] and nieuw["Simu"][0][-2:] == ["Vast lokaal", "Kan spelen"]
+    for modus in ("kans1", "her"):
+        a, b = rc.maak_rooster(nieuw, modus), rc.maak_rooster(oud, modus)
+        assert a["fouten"] == [] and a["bladen"][a["namen"]["rooster"]] == b["bladen"][b["namen"]["rooster"]]
