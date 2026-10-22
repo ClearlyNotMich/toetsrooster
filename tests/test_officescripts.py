@@ -3,6 +3,7 @@ import copy
 import json
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -16,18 +17,18 @@ SCRIPTS = {"kans1": "OWB Exam Roster Generator.txt", "her": "OWB Retake Exam Ros
 
 
 def test_scripts_zijn_actueel():
-    assert subprocess.run(["python3", str(ROOT / "tools" / "bouw_scripts.py"), "--check"]).returncode == 0
+    assert subprocess.run([sys.executable, str(ROOT / "tools" / "bouw_scripts.py"), "--check"]).returncode == 0
 
 
 @pytest.fixture(scope="module")
 def gecompileerd(tmp_path_factory):
-    tsc = ROOT / "node_modules" / ".bin" / "tsc"
+    tsc = ROOT / "node_modules" / "typescript" / "bin" / "tsc"  # via node: werkt ook op Windows
     assert tsc.exists(), "draai eerst: npm install"
     uit = {}
     for modus, naam in SCRIPTS.items():
         map_ = tmp_path_factory.mktemp(modus)
         shutil.copy(ROOT / naam, map_ / "script.ts")
-        r = subprocess.run([str(tsc), "--strict", "--noImplicitAny", "--noEmitOnError", "--target", "es2017",
+        r = subprocess.run(["node", str(tsc), "--strict", "--noImplicitAny", "--noEmitOnError", "--target", "es2017",
                             "--lib", "es2017", "--outDir", str(map_ / "js"), str(OS / "excelscript.d.ts"),
                             str(OS / "globals.d.ts"), str(map_ / "script.ts")], capture_output=True, text=True)
         assert r.returncode == 0, r.stdout + r.stderr
