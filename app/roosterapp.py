@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (QApplication, QButtonGroup, QFileDialog, QFrame, 
 import rooster_core as rc
 import thema
 import uitvoer
-from onderdelen import InstellingenFormulier, Segment, SimuImport, StatKaart, label
+from onderdelen import InstellingenFormulier, Segment, SimuImport, SimuVast, StatKaart, label
 from thema import KLEUR
 
 HULP = """
@@ -40,7 +40,9 @@ HULP = """
       en in kolom B de waarden eronder, zoals je het opschrijft. Uit een ander bestand: <i>Concept laden…</i> in de zijbalk.
       ‘ochtend tot 13.00’ en ‘middag vanaf 13.30’ delen een lokaal; een naam met (opmerking) is reserve.</li>
   <li><b>Simu</b> — één rij per simucliënt per toetsdag, eventueel met <i>Vanaf</i>/<i>Tot</i>.
-      Sneller: <i>Simu's importeren…</i> in de zijbalk neemt ze over uit het overzicht ‘Beschikbaarheid simu's’.</li>
+      Sneller: <i>Simu's importeren…</i> in de zijbalk neemt ze over uit het overzicht ‘Beschikbaarheid simu's’.
+      Met <i>Simucliënten…</i> kies je per simu of hij van lokaal wisselt (standaard) of vast in één lokaal blijft
+      (kolom <i>Vast lokaal</i>).</li>
   </ul></li>
 <li><b>Open de werkmap</b> hier (download hem eerst uit OneDrive/SharePoint).</li>
 <li>Controleer de <b>instellingen</b>: eerste en laatste toets, toetsduur, wisseltijd en pauzes. Daaruit worden alle
@@ -174,6 +176,10 @@ class Venster(QMainWindow):
         self.knop_import.setToolTip("Simucliënten voor de toetsdag overnemen uit het overzicht ‘Beschikbaarheid simu's’.")
         self.knop_import.clicked.connect(lambda: self.importeer_simus())
         lay.addWidget(self.knop_import)
+        self.knop_simus = QPushButton("Simucliënten…", cursor=Qt.PointingHandCursor)
+        self.knop_simus.setToolTip("Per simucliënt kiezen: wisselt van lokaal, of blijft vast in een lokaal.")
+        self.knop_simus.clicked.connect(lambda: self.simus_instellen())
+        lay.addWidget(self.knop_simus)
         return z
 
     def _rooster_pagina(self) -> QWidget:
@@ -323,6 +329,7 @@ class Venster(QMainWindow):
         self.knop_maak.setEnabled(open_)
         self.knop_import.setEnabled(open_)
         self.knop_concept.setEnabled(open_)
+        self.knop_simus.setEnabled(open_)
         for k in (self.knop_opslaan, self.knop_pdf, self.knop_pdf_rooster):
             k.setEnabled(False)
 
@@ -548,6 +555,33 @@ class Venster(QMainWindow):
         c = self.concept()
         self.statusBar().showMessage(f"Concept geladen uit {Path(pad).name}" + (f" ({rc.datum_tekst(c['d'])})" if c and c["d"] else "")
                                      + ". Maak het rooster opnieuw; ‘Excel opslaan’ bewaart het als blad ‘Concept’.")
+        return True
+
+    def lokalen(self) -> list:
+        """Lokalen van de gekozen toets (uit het conceptblad of het blad Toetsdag)."""
+        c = self.concept()
+        if c:
+            return list(dict.fromkeys(x["lokaal"] for x in c["slots"]))
+        dag = self.bladen.get(self.instellingen.waarden()[rc.MODI[self.modus.waarde()]["dag"]]) or []
+        k = rc.kolom(dag[0], "lokaal") if dag else -1
+        return list(dict.fromkeys(rc.tekst(r[k]) for r in dag[1:] if k >= 0 and rc.tekst(rc.cel(r, k))))
+
+    def simus_instellen(self, kies=None) -> bool:
+        """Per simu 'Vast lokaal' kiezen. `kies` vervangt de dialoog (tests)."""
+        blad = self.instellingen.waarden()["blad_simu"]
+        simu = self.bladen.get(blad)
+        if not simu or rc.kolom(simu[0], "tijd") >= 0 or len(simu) < 2:
+            QMessageBox.information(self, "Geen simucliënten", "Het blad Simu is leeg of in de oude vorm (met kolom Tijd). "
+                                    "Vul het eerst, bijvoorbeeld met ‘Simu's importeren…’.")
+            return False
+        dlg = SimuVast(simu, self.lokalen(), self)
+        if not (kies(dlg) if kies else dlg.exec()):
+            return False
+        self.bladen[blad] = self.ingevoerd[blad] = uitvoer.simu_vast_bijwerken(simu, dlg.waarden())
+        self.verouderd()
+        vast = sum(1 for w in dlg.waarden().values() if w)
+        self.statusBar().showMessage(f"{vast} simucliënt(en) vast, de rest wisselt mee. Maak het rooster opnieuw; "
+                                     "‘Excel opslaan’ bewaart het blad Simu.")
         return True
 
     def sjabloon(self, doel: str | None = None) -> str | None:

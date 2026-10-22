@@ -4,7 +4,7 @@ from __future__ import annotations
 from PySide6.QtCore import Property, QDate, QEasingCurve, QPropertyAnimation, QRectF, QSize, Qt, QTime, Signal
 from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import (QAbstractButton, QButtonGroup, QComboBox, QDateEdit, QDialog, QDialogButtonBox,
-                               QFrame, QGridLayout, QListWidget, QListWidgetItem,
+                               QFrame, QGridLayout, QHeaderView, QListWidget, QListWidgetItem, QTableWidget, QTableWidgetItem,
                                QHBoxLayout, QLabel, QLineEdit, QPushButton, QSpinBox, QTimeEdit, QVBoxLayout, QWidget)
 
 import rooster_core as rc
@@ -373,3 +373,71 @@ class SimuImport(QDialog):
 
     def gekozen_datum(self) -> int:
         return QDate(1899, 12, 30).daysTo(self.datum.date())
+
+
+WISSELT = "Wisselt mee"
+VAST_AUTO = "Vast (eigen lokaal)"
+
+
+class SimuVast(QDialog):
+    """Per simucliënt kiezen: wisselt mee met de instelling, of blijft vast in (een) lokaal."""
+
+    def __init__(self, simu: list, lokalen: list, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Simucliënten")
+        self.setMinimumSize(640, 520)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(24, 20, 24, 20)
+        lay.setSpacing(12)
+        lay.addWidget(label("Simucliënten", "legenda"))
+        lay.addWidget(label("Standaard wisselen simu's van lokaal volgens de instelling ‘Simu's wisselen van lokaal’, "
+                            "zodat ze niet steeds dezelfde casus spelen. Wil iemand liever op één plek blijven, kies dan "
+                            "‘Vast (eigen lokaal)’ of een lokaal. Dit komt in de kolom ‘Vast lokaal’ van het blad Simu.",
+                            "gedempt", wrap=True))
+        kop = simu[0]
+        kd, kn = rc.kolom(kop, "datum"), rc.kolom(kop, "simuclint", "simu", "simulant", "naam")
+        kv, kt, kl = rc.kolom(kop, "vanaf", "van"), rc.kolom(kop, "tot"), rc.kolom(kop, "vastlokaal")
+        self.rijen = [i for i, r in enumerate(simu) if i and rc.tekst(rc.cel(r, kn))]
+        self.tabel = QTableWidget(len(self.rijen), 4)
+        self.tabel.setHorizontalHeaderLabels(["Datum", "Simucliënt", "Tijd", "Lokaal"])
+        self.tabel.verticalHeader().setVisible(False)
+        self.tabel.verticalHeader().setDefaultSectionSize(40)
+        self.tabel.setShowGrid(False)
+        self.tabel.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.tabel.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.tabel.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.tabel.horizontalHeader().setStretchLastSection(True)
+        self.keuzes = []
+        for r, i in enumerate(self.rijen):
+            rij = simu[i]
+            d = rc.naar_datum(rc.cel(rij, kd)) if rc.tekst(rc.cel(rij, kd)) else None
+            van, tot = (rc.naar_minuten(rc.cel(rij, k)) if rc.tekst(rc.cel(rij, k)) else None for k in (kv, kt))
+            tijd = f"{rc.tijd_tekst(van) if van is not None else 'begin'} – {rc.tijd_tekst(tot) if tot is not None else 'eind'}"
+            for c, w in enumerate((rc.datum_tekst(d) if d else "elke dag", rc.tekst(rc.cel(rij, kn)), tijd)):
+                self.tabel.setItem(r, c, QTableWidgetItem(w))
+            keuze = QComboBox()
+            keuze.addItems([WISSELT, VAST_AUTO] + list(lokalen))
+            nu = rc.tekst(rc.cel(rij, kl))
+            if rc.norm(nu) in ("", "nee", "n", "wisselt"):
+                keuze.setCurrentText(WISSELT)
+            elif rc.waar(nu):
+                keuze.setCurrentText(VAST_AUTO)
+            else:
+                if keuze.findText(nu) < 0:
+                    keuze.addItem(nu)
+                keuze.setCurrentText(nu)
+            self.tabel.setCellWidget(r, 3, keuze)
+            self.keuzes.append(keuze)
+        lay.addWidget(self.tabel, 1)
+        knoppen = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        knoppen.button(QDialogButtonBox.Ok).setText("Opslaan in blad Simu")
+        knoppen.button(QDialogButtonBox.Ok).setObjectName("primair")
+        knoppen.button(QDialogButtonBox.Cancel).setText("Annuleren")
+        knoppen.accepted.connect(self.accept)
+        knoppen.rejected.connect(self.reject)
+        lay.addWidget(knoppen)
+
+    def waarden(self) -> dict:
+        """Rijnummer in het blad Simu -> waarde voor 'Vast lokaal' ('' = wisselt, 'Ja' = vast, of een lokaal)."""
+        return {i: "" if k.currentText() == WISSELT else "Ja" if k.currentText() == VAST_AUTO else k.currentText()
+                for i, k in zip(self.rijen, self.keuzes)}

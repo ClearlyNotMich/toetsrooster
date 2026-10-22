@@ -169,7 +169,20 @@ def concept_kapot():
     return b
 
 
+def concept_vaste_simus(rotatie):
+    def maak():
+        b = mv.concept_bladen()
+        b["Instellingen"] = rc.instellingen_matrix({"simu_rotatie": rotatie})
+        b["Simu"][0].append("Vast lokaal")
+        for rij, v in zip(b["Simu"][1:], ["C2", "Ja", "Nee", "Z9", "C2", "", "", ""]):
+            rij.append(v)
+        return b
+    return maak
+
+
 SCENARIOS = {
+    "concept_vast_na_elke_toets": concept_vaste_simus("Na elke toets"),
+    "concept_vast_na_elke_pauze": concept_vaste_simus("Na elke pauze"),
     "concept": mv.concept_bladen,
     "concept_na_elke_toets": concept_met(simu_rotatie="Na elke toets", casus_na="Na elke pauze afwisselen"),
     "concept_oude_waarde_ja": concept_met(simu_rotatie="Ja"),

@@ -478,10 +478,12 @@ def lees_toetsdag(matrix: list, blad: str, s: dict, fouten: list) -> tuple[list,
 
 
 def lees_simu_dag(matrix: list, blad: str, fouten: list, meldingen: list) -> list:
-    """Blad Simu zonder kolom Tijd: één rij per simucliënt per dag (Datum leeg = elke dag), met Vanaf/Tot."""
+    """Blad Simu zonder kolom Tijd: één rij per simucliënt per dag (Datum leeg = elke dag), met Vanaf/Tot en
+    optioneel 'Vast lokaal': leeg = wisselt volgens de instelling, Ja = blijft in één lokaal, of een lokaalnaam."""
     kop = list(matrix[0])
     kn, kd = kolom(kop, "simuclint", "simu", "simulant", "naam"), kolom(kop, "datum")
     kv, kt = kolom(kop, "vanaf", "van"), kolom(kop, "tot")
+    kl = kolom(kop, "vastlokaal")
     if kn < 0:
         fouten.append(f"Blad '{blad}': kolom 'simucliënt' ontbreekt.")
         return []
@@ -502,7 +504,9 @@ def lees_simu_dag(matrix: list, blad: str, fouten: list, meldingen: list) -> lis
             meldingen.append(("Waarschuwing", f"Blad '{blad}' rij {i + 1}: {naam} staat al eerder op "
                               f"{datum_tekst(d) if d is not None else 'elke dag'}; telt maar één keer."))
             continue
-        lijst.append({"naam": naam, "d": d, "van": van, "tot": tot})
+        vast = tekst(cel(rij, kl))
+        lijst.append({"naam": naam, "d": d, "van": van, "tot": tot,
+                      "vast": "" if norm(vast) in ("", "nee", "n", "wisselt") else "ja" if waar(vast) else vast})
     return lijst
 
 
@@ -531,6 +535,28 @@ def simu_rotatie(slots: list, simus: list, s: dict, meldingen: list) -> dict:
             andere = sorted({datum_tekst(x["d"]) for x in simus if x["d"] is not None})
             meldingen.append(("Waarschuwing", f"Geen simucliënten voor {datum_tekst(d)} in het blad Simu" +
                               (f" (er staan er wel voor {', '.join(andere)})." if andere else ".")))
+    # Vaste simu's: eerst wie een lokaal heeft opgegeven, dan 'Ja' in het eerste lokaal dat nog vrij is.
+    thuis: dict = {}
+    for d, lokalen in kamers.items():
+        thuis[d] = {}
+        die_dag = []
+        for x in simus:
+            if (x["d"] is None or x["d"] == d) and x["vast"] and x["naam"] not in [y["naam"] for y in die_dag]:
+                die_dag.append(x)
+        for x in [y for y in die_dag if y["vast"] != "ja"]:
+            if norm(x["vast"]) not in lokalen:
+                meldingen.append(("Waarschuwing", f"{x['naam']}: vast lokaal '{x['vast']}' bestaat niet op "
+                                  f"{datum_tekst(d)}; deze simu wisselt nu gewoon mee."))
+            elif norm(x["vast"]) in thuis[d]:
+                meldingen.append(("Waarschuwing", f"{x['naam']}: lokaal {x['vast']} is al vast voor "
+                                  f"{thuis[d][norm(x['vast'])]['naam']}; deze simu wisselt nu gewoon mee."))
+            else:
+                thuis[d][norm(x["vast"])] = x
+        for x in [y for y in die_dag if y["vast"] == "ja"]:
+            vrij_ = [k for k in lokalen if k not in thuis[d]]
+            if vrij_:
+                thuis[d][vrij_[0]] = x
+    vaste_namen = {d: [x["naam"] for x in h.values()] for d, h in thuis.items()}
     gekozen: dict = {}
     for sleutel, (a, e, ks) in bereik.items():
         d, b = (int(x) for x in sleutel.split("_"))
@@ -548,8 +574,15 @@ def simu_rotatie(slots: list, simus: list, s: dict, meldingen: list) -> dict:
     for slot in slots:
         b = blok(slot["t"])
         g = gekozen[f"{slot['d']}_{b}"]
-        k = (kamers[slot["d"]].index(norm(slot["lokaal"])) + stap(slot["d"], slot["t"])) % len(g) if g else 0
-        lijst = [{"naam": x["naam"], "casus": "", "lokaal": ""} for x in g[k:] + g[:k] if kan(x, slot["t"], slot["t"] + s["duur"])]
+        lokaal = norm(slot["lokaal"])
+        h = thuis[slot["d"]].get(lokaal)
+        eigen = [h] if h and h in g else []
+        wissel = [x for x in g if x["naam"] not in vaste_namen[slot["d"]]]
+        kamers_rot = [k_ for k_ in kamers[slot["d"]] if k_ not in thuis[slot["d"]]]
+        plek = kamers_rot.index(lokaal) if lokaal in kamers_rot else kamers[slot["d"]].index(lokaal)
+        k = (plek + stap(slot["d"], slot["t"])) % len(wissel) if wissel else 0
+        lijst = [{"naam": x["naam"], "casus": "", "lokaal": ""} for x in eigen + wissel[k:] + wissel[:k]
+                 if kan(x, slot["t"], slot["t"] + s["duur"])]
         if lijst:
             uit[f"{slot['d']}_{slot['t']}_{norm(slot['lokaal'])}"] = lijst
         else:

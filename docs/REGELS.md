@@ -15,7 +15,7 @@ Je vult drie dingen in. Het programma maakt de rest.
    - *Datum*, *Lokaal*, *Casus*;
    - *Casus na pauze* (optioneel), *Vaardigheid*, *Beoordelaar*;
    - *Beoordelaar 2* en *Wissel om* (optioneel), voor een wissel halverwege de dag. Bijvoorbeeld: Youri tot 12:25, daarna Nadine.
-3. **Simu**: één rij per simucliënt per toetsdag: *Datum*, *simucliënt*, en optioneel *Vanaf* en *Tot*. Een lege datum betekent elke dag. In de app vul je dit blad met **Simu's importeren…** vanuit het overzicht *Beschikbaarheid simu's*.
+3. **Simu**: één rij per simucliënt per toetsdag: *Datum*, *simucliënt*, en optioneel *Vanaf*, *Tot* en *Vast lokaal*. Een lege datum betekent elke dag. In de app vul je dit blad met **Simu's importeren…** vanuit het overzicht *Beschikbaarheid simu's*.
 
 Uit de instellingen (eerste toets, laatste toets, toetsduur, wisseltijd en pauzes) maakt het programma alle slots. Met de standaardwaarden is dat elke 20 minuten een student (15 min toets + 5 min wissel): 09:40–11:15, 11:45–13:00, 14:00–15:15 en 15:45–17:00. Dat zijn 17 slots per lokaal, net als op de echte toetsdag van 14 april.
 
@@ -124,6 +124,15 @@ Alle instellingen staan in het blad **Instellingen** en in de app op de pagina *
    - Met *Simu's wisselen van lokaal* = **Na elke pauze** krijgt lokaal *k* simu *(k + aantal pauzes) mod n*.
    - Met **Na elke toets** krijgt lokaal *k* simu *(k + hoeveelste tijd van de dag) mod n*, zodat elke simu na iedere toets een lokaal doorschuift en niet de hele dag bij dezelfde toets zit.
    - Met **Nee** blijft iedere simu in hetzelfde lokaal.
+
+   De beoordelaar en de casus blijven de hele dag in hun lokaal. Alleen de simu's schuiven door, zodat ze niet steeds dezelfde casus spelen.
+
+   **Per simu** kan dat anders, via de kolom *Vast lokaal* in het blad Simu (of in de app met **Simucliënten…**):
+   - leeg: wisselt mee volgens de instelling;
+   - *Ja*: blijft de hele dag in één lokaal (het eerste lokaal dat nog vrij is);
+   - een lokaalnaam, bijvoorbeeld *C1.39*: blijft altijd in dat lokaal.
+
+   De andere simu's wisselen dan alleen tussen de overige lokalen. Een onbekend of al bezet lokaal geeft een waarschuwing; die simu wisselt dan gewoon mee.
 
    Er volgt een waarschuwing:
    - bij minder simu's dan lokalen;

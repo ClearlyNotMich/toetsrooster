@@ -27,7 +27,7 @@ interface Student {
     i: number; nr: string; voornaam: string; tv: string; achternaam: string; klas: string;
     verboden: string[]; ttv: boolean; her: boolean; eb: string; ec: string; voorkeur: string; opm: string;
 }
-interface SimuDag { naam: string; d: number | null; van: number | null; tot: number | null; }
+interface SimuDag { naam: string; d: number | null; van: number | null; tot: number | null; vast: string; }
 interface Bereik { d: number; b: number; a: number; e: number; ks: string[]; }
 interface Inst { w: Map<string, Cel>; pauzes: number[][]; }
 interface Inzet { naam: string; tekst: string; opm: string; tot: number | null; van: number | null; }
@@ -640,13 +640,15 @@ function leesToetsdag(matrix: Matrix, blad: string, tijden: number[], fouten: st
     }
 }
 
-// Blad Simu zonder kolom Tijd: één rij per simucliënt per dag (Datum leeg = elke dag), met Vanaf/Tot.
+// Blad Simu zonder kolom Tijd: één rij per simucliënt per dag (Datum leeg = elke dag), met Vanaf/Tot en
+// optioneel 'Vast lokaal': leeg = wisselt volgens de instelling, Ja = blijft in één lokaal, of een lokaalnaam.
 function leesSimuDag(matrix: Matrix, blad: string, fouten: string[], meldingen: Cel[][]): SimuDag[] {
     const kop: Cel[] = matrix[0];
     const kn: number = kolom(kop, ["simuclint", "simu", "simulant", "naam"]);
     const kd: number = kolom(kop, ["datum"]);
     const kv: number = kolom(kop, ["vanaf", "van"]);
     const kt: number = kolom(kop, ["tot"]);
+    const kl: number = kolom(kop, ["vastlokaal"]);
     const lijst: SimuDag[] = [];
     if (kn < 0) {
         fouten.push(`Blad '${blad}': kolom 'simucliënt' ontbreekt.`);
@@ -671,7 +673,11 @@ function leesSimuDag(matrix: Matrix, blad: string, fouten: string[], meldingen: 
                 `${d !== null ? datumTekst(d) : "elke dag"}; telt maar één keer.`]);
             continue;
         }
-        lijst.push({ naam: naam, d: d, van: van, tot: tot });
+        const vast: string = tekst(cel(rij, kl));
+        lijst.push({
+            naam: naam, d: d, van: van, tot: tot,
+            vast: ["", "nee", "n", "wisselt"].indexOf(norm(vast)) >= 0 ? "" : waar(vast) ? "ja" : vast,
+        });
     }
     return lijst;
 }
@@ -728,6 +734,39 @@ function simuRotatie(slots: Slot[], simus: SimuDag[], pz: number[][], duur: numb
                 (andere.length > 0 ? ` (er staan er wel voor ${andere.join(", ")}).` : ".")]);
         }
     });
+    // Vaste simu's: eerst wie een lokaal heeft opgegeven, dan 'Ja' in het eerste lokaal dat nog vrij is.
+    const thuis: Map<number, Map<string, SimuDag>> = new Map<number, Map<string, SimuDag>>();
+    const vasteNamen: Map<number, string[]> = new Map<number, string[]>();
+    kamers.forEach((lokalen: string[], d: number) => {
+        const h: Map<string, SimuDag> = new Map<string, SimuDag>();
+        const dieDag: SimuDag[] = [];
+        for (const x of simus) {
+            if ((x.d === null || x.d === d) && x.vast && !dieDag.some((y: SimuDag) => y.naam === x.naam)) {
+                dieDag.push(x);
+            }
+        }
+        for (const x of dieDag.filter((y: SimuDag) => y.vast !== "ja")) {
+            if (lokalen.indexOf(norm(x.vast)) < 0) {
+                meldingen.push(["Waarschuwing", `${x.naam}: vast lokaal '${x.vast}' bestaat niet op ` +
+                    `${datumTekst(d)}; deze simu wisselt nu gewoon mee.`]);
+            } else if (h.has(norm(x.vast))) {
+                meldingen.push(["Waarschuwing", `${x.naam}: lokaal ${x.vast} is al vast voor ` +
+                    `${(h.get(norm(x.vast)) as SimuDag).naam}; deze simu wisselt nu gewoon mee.`]);
+            } else {
+                h.set(norm(x.vast), x);
+            }
+        }
+        for (const x of dieDag.filter((y: SimuDag) => y.vast === "ja")) {
+            const vrije: string[] = lokalen.filter((k: string) => !h.has(k));
+            if (vrije.length > 0) {
+                h.set(vrije[0], x);
+            }
+        }
+        thuis.set(d, h);
+        const namen: string[] = [];
+        h.forEach((x: SimuDag) => namen.push(x.naam));
+        vasteNamen.set(d, namen);
+    });
     const gekozen: Map<string, SimuDag[]> = new Map<string, SimuDag[]>();
     bereik.forEach((x: Bereik, sleutel: string) => {
         const geschikt: SimuDag[] = [];
@@ -748,9 +787,17 @@ function simuRotatie(slots: Slot[], simus: SimuDag[], pz: number[][], duur: numb
     for (const slot of slots) {
         const b: number = blok(slot.t);
         const g: SimuDag[] = gekozen.get(`${slot.d}_${b}`) as SimuDag[];
-        const k: number = g.length > 0
-            ? ((kamers.get(slot.d) as string[]).indexOf(norm(slot.lokaal)) + stap(slot.d, slot.t)) % g.length : 0;
-        const lijst: Persoon[] = g.slice(k).concat(g.slice(0, k)).filter((x: SimuDag) => kan(x, slot.t, slot.t + duur))
+        const lokaal: string = norm(slot.lokaal);
+        const h: Map<string, SimuDag> = thuis.get(slot.d) as Map<string, SimuDag>;
+        const vaste: SimuDag | undefined = h.get(lokaal);
+        const eigen: SimuDag[] = vaste && g.indexOf(vaste) >= 0 ? [vaste] : [];
+        const wissel: SimuDag[] = g.filter((x: SimuDag) => (vasteNamen.get(slot.d) as string[]).indexOf(x.naam) < 0);
+        const alleKamers: string[] = kamers.get(slot.d) as string[];
+        const kamersRot: string[] = alleKamers.filter((k: string) => !h.has(k));
+        const plek: number = kamersRot.indexOf(lokaal) >= 0 ? kamersRot.indexOf(lokaal) : alleKamers.indexOf(lokaal);
+        const k: number = wissel.length > 0 ? (plek + stap(slot.d, slot.t)) % wissel.length : 0;
+        const lijst: Persoon[] = eigen.concat(wissel.slice(k), wissel.slice(0, k))
+            .filter((x: SimuDag) => kan(x, slot.t, slot.t + duur))
             .map((x: SimuDag) => ({ naam: x.naam, casus: "", lokaal: "" }));
         if (lijst.length > 0) {
             uit.set(`${slot.d}_${slot.t}_${norm(slot.lokaal)}`, lijst);

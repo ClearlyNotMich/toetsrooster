@@ -186,3 +186,30 @@ def test_concept_laden_en_import_zonder_passende_kolom(tmp_path):
     assert r["fouten"] == [] and v.stat_in.waarde.text() == "61 / 61"
     assert {rij[2] for rij in r["bladen"]["Rooster_Kans1"][1:]} == {"A1", "A2", "B1", "B2", "C1", "Praktijkhuis", "C2"}
     assert "Concept" in rc.lees_werkmap(v.opslaan(str(tmp_path / "uit.xlsx")))
+
+
+def test_simus_vast_lokaal_in_app(tmp_path):
+    bron = tmp_path / "werkmap.xlsx"
+    mv.schrijf(bron, mv.concept_bladen())
+    app = roosterapp.QApplication.instance() or roosterapp.QApplication([])  # noqa: F841
+    v = roosterapp.Venster()
+    v.open(str(bron))
+    v.instellingen.velden["simu_rotatie"].setCurrentText("Na elke toets")
+    assert v.lokalen() == ["A1", "A2", "B1", "B2", "C1", "Praktijkhuis", "C2"]
+
+    def kies(dlg):
+        assert [k.currentText() for k in dlg.keuzes][:2] == ["Wisselt mee", "Wisselt mee"]
+        assert dlg.keuzes[0].findText("C2") >= 0
+        dlg.keuzes[0].setCurrentText("C2")
+        dlg.keuzes[1].setCurrentText("Vast (eigen lokaal)")
+        return True
+    assert v.simus_instellen(kies)
+    r = v.maak()
+    rooster = r["bladen"]["Rooster_Kans1"]
+    assert {rij[2] for rij in rooster[1:] if rij[6] == "Siem"} == {"C2"} and {rij[2] for rij in rooster[1:] if rij[6] == "Tom"} == {"A1"}
+    assert len({rij[6] for rij in rooster[1:] if rij[2] == "B1"}) > 1
+    uit = rc.lees_werkmap(v.opslaan(str(tmp_path / "uit.xlsx")))["Simu"]
+    assert uit[0][4] == "Vast lokaal" and [r_[4] for r_ in uit[1:3]] == ["C2", "Ja"]
+    # importeren daarna houdt 'Vast lokaal' per naam vast
+    nieuw = uitvoer.simu_blad_met(uit, 46371, [{"naam": "Siem", "van": None, "tot": None}, {"naam": "Nieuw", "van": None, "tot": None}])
+    assert [r_[4] for r_ in nieuw[1:]] == ["C2", ""]

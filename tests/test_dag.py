@@ -283,3 +283,38 @@ def test_simus_wisselen_na_elke_toets():
         simus = [x["simucliënt"] for x in alle if x["Tijd"] == t]
         assert len(simus) == len(set(simus))
     assert rc.lees_instellingen(rc.instellingen_matrix({"simu_rotatie": "Ja"}), [])["simu_rotatie"] == "Na elke pauze"
+
+
+def test_simu_vast_lokaal_per_simu():
+    def vast(b):
+        b["Instellingen"] = rc.instellingen_matrix({"simu_rotatie": "Na elke toets"})
+        b["Simu"][0].append("Vast lokaal")
+        for rij in b["Simu"][1:]:
+            rij.append("")
+        b["Simu"][1][4] = "C2"   # Siem altijd in C2
+        b["Simu"][2][4] = "Ja"   # Tom in het eerste vrije lokaal (A1)
+        b["Simu"][3][4] = "Nee"  # Uma wisselt (zoals leeg)
+    r = concept(vast)
+    alle = rijen(r)
+    assert {x["Lokaal"] for x in alle if x["simucliënt"] == "Siem"} == {"C2"}
+    assert {x["Lokaal"] for x in alle if x["simucliënt"] == "Tom"} == {"A1"}
+    assert {x["simucliënt"] for x in alle if x["Lokaal"] == "C2"} == {"Siem"}
+    wisselend = {x["simucliënt"] for x in alle if x["Lokaal"] == "B1"}
+    assert len(wisselend) > 1 and not wisselend & {"Siem", "Tom"}  # de rest wisselt na elke toets
+    for t in {x["Tijd"] for x in alle}:
+        simus = [x["simucliënt"] for x in alle if x["Tijd"] == t]
+        assert len(simus) == len(set(simus))
+
+
+def test_simu_vast_lokaal_fouten_en_zonder_wissel_instelling():
+    def vast(b):
+        b["Simu"][0].append("Vast lokaal")
+        for rij in b["Simu"][1:]:
+            rij.append("")
+        b["Simu"][1][4] = "Z9"   # bestaat niet
+        b["Simu"][2][4] = "A1"
+        b["Simu"][3][4] = "A1"   # al bezet
+    r = concept(vast)
+    tekst = " ".join(m[1] for m in r["meldingen"])
+    assert "Siem: vast lokaal 'Z9' bestaat niet" in tekst and "Uma: lokaal A1 is al vast voor Tom" in tekst
+    assert {x["simucliënt"] for x in rijen(r) if x["Lokaal"] == "A1"} == {"Tom"}

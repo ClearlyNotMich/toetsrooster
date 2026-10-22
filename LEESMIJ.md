@@ -33,7 +33,7 @@ De knoppen op het blad *Studenten* verwijzen naar de scripts in je OneDrive. Ver
 |---|---|---|
 | **Studenten** | student | Studentnummer, Voornaam/Roepnaam, Tussenvoegsel, Achternaam, Klas, Niet inroosteren bij SB-docent, Niet inroosteren bij de vaardighedendocent, en optioneel TTV, Voorkeur, Opmerkingen en IsHerkanser |
 | **Toetsdag_Kans1** / **Toetsdag_Her** | lokaal per toetsdag | Datum, Lokaal, Casus, Casus na pauze, Vaardigheid, Beoordelaar, Beoordelaar 2, Wissel om |
-| **Simu** | simucliënt per toetsdag | Datum, simucliënt, Vanaf, Tot |
+| **Simu** | simucliënt per toetsdag | Datum, simucliënt, Vanaf, Tot, en optioneel Vast lokaal (leeg = wisselt mee, Ja = blijft in één lokaal, of een lokaalnaam) |
 
 De tijden van de dag (eerste toets, laatste toets, toetsduur, wisseltijd en pauzes) staan in het blad **Instellingen**. Ze zijn ingesteld zoals op de echte toetsdag: 15 min toets + 5 min wissel, van 09:40 tot 17:00, met pauzes om 11:15, 13:00 en 15:15.
 
@@ -47,7 +47,7 @@ De volledige regels staan in [docs/REGELS.md](docs/REGELS.md). Werkmappen met de
   - begin en eind van de dag, wisseltijd en studiejaar;
   - toetsduur per jaar: standaard 15 min, TTV 20 min. Dit was eerst 10/15; het is aangepast aan het echte rooster;
   - pauzes en wanneer de casus wisselt;
-  - of simu's na elke pauze, na elke toets of nooit van lokaal wisselen;
+  - of simu's na elke pauze, na elke toets of nooit van lokaal wisselen. Beoordelaars en casussen blijven in hun lokaal; per simu kan een vast lokaal worden opgegeven;
   - vrije plekken tonen;
   - de grens tussen ochtend en middag voor voorkeuren;
   - waar TTV-studenten komen;
@@ -101,6 +101,7 @@ Pak de zip uit. Er hoeft niets anders geïnstalleerd te worden: Python en Qt zit
    - De kolom van de toetsdag wordt vanzelf gekozen.
    - Wie beschikbaar is, staat in de lijst; het aantal 'nodig' is alvast aangevinkt. Een '?' wordt niet aangevinkt.
    - De gekozen simu's komen in het blad Simu en gaan mee bij *Excel opslaan*.
+   - Met **Simucliënten…** kies je per simu of hij van lokaal wisselt of vast in een lokaal blijft.
 4. Controleer de pagina **Instellingen**. Deze wordt gevuld vanuit het blad Instellingen van de werkmap. *Standaardwaarden* zet alles terug.
 5. Kies op de pagina **Rooster** voor **Eerste kans** of **Herkansing** en klik op **Rooster maken**.
    - De kaarten tonen hoeveel studenten zijn ingeroosterd, hoeveel vrije plekken er over zijn, en of er waarschuwingen zijn of studenten zonder plek.
