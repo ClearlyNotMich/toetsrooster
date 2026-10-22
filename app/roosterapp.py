@@ -12,7 +12,9 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+import json
+
+from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (QApplication, QButtonGroup, QFileDialog, QFrame, QHBoxLayout, QHeaderView, QMainWindow,
                                QMessageBox, QPushButton, QScrollArea, QStackedWidget, QTableWidget, QTableWidgetItem,
@@ -40,7 +42,8 @@ HULP = """
   <li>Liever een lijst, zoals op papier? Zet die als extra blad in de werkmap. Zie de README.</li>
   </ul></li>
 <li>Open de werkmap. Download hem eerst uit OneDrive of SharePoint.</li>
-<li>Kijk de instellingen na: tijden, toetsduur, pauzes en wanneer simu's van lokaal wisselen.</li>
+<li>Kijk de instellingen na: tijden, toetsduur, pauzes en wanneer simu's van lokaal wisselen. Het programma onthoudt
+  ze, ook na afsluiten. Heeft een werkmap andere instellingen, dan kun je die overnemen op de pagina Instellingen.</li>
 <li>Kies Eerste kans of Herkansing en klik op Rooster maken. Kijk daarna bij Meldingen.</li>
 <li>Sla op als Excel, of maak een pdf voor docenten of voor studenten. Je originele bestand blijft ongewijzigd.</li>
 </ol>
@@ -98,6 +101,9 @@ class Venster(QMainWindow):
         self.pad: str | None = None
         self.bladen: dict | None = None
         self.resultaat: dict | None = None
+        self.werkmap_instellingen: dict | None = None  # instellingen uit het blad Instellingen van de open werkmap
+        # Eigen instellingen blijven bewaard tussen sessies (Windows: %APPDATA%\Toetsrooster, Linux: ~/.config/Toetsrooster).
+        self.opslag = QSettings(QSettings.IniFormat, QSettings.UserScope, "Toetsrooster", "Toetsrooster")
 
         midden = QWidget(objectName="inhoud")
         self.setCentralWidget(midden)
@@ -112,7 +118,11 @@ class Venster(QMainWindow):
         h.addWidget(self.paginas, 1)
         self.nav.buttons()[0].setChecked(True)
         self.statusBar().showMessage("Open een werkmap om te beginnen.")
+        bewaard = self.bewaarde_instellingen()
+        if bewaard:
+            self.instellingen.zet(bewaard)
         self.instellingen.gewijzigd.connect(self.verouderd)
+        self.instellingen.gewijzigd.connect(self.bewaar_instellingen)
         self.modus.gewijzigd.connect(self.andere_toets)
         self.toon_samenvatting()
         self.toon_leeg()
@@ -243,6 +253,11 @@ class Venster(QMainWindow):
         w, lay, acties = pagina("Instellingen", "Worden bij ‘Excel opslaan’ in het blad Instellingen bewaard, zodat de knoppen "
                                                "in Excel Online dezelfde regels gebruiken.")
         lay.setSpacing(24)
+        self.knop_uit_werkmap = QPushButton("Uit werkmap overnemen", cursor=Qt.PointingHandCursor)
+        self.knop_uit_werkmap.setToolTip("De instellingen uit het blad Instellingen van de geopende werkmap gebruiken.")
+        self.knop_uit_werkmap.clicked.connect(lambda: self.instellingen_uit_werkmap())
+        self.knop_uit_werkmap.setEnabled(False)
+        acties.addWidget(self.knop_uit_werkmap)
         herstel = QPushButton("Standaardwaarden", cursor=Qt.PointingHandCursor)
         herstel.clicked.connect(lambda: self.instellingen.herstel())
         acties.addWidget(herstel)
@@ -376,13 +391,25 @@ class Venster(QMainWindow):
             return False
         self.pad, self.bladen, self.resultaat = pad, bladen, None
         self.ingevoerd = {}  # in de app aangepaste invoerbladen (bijv. Simu na importeren); gaan mee bij opslaan
-        self.instellingen.zet(rc.instellingen_waarden(bladen.get(rc.INSTELLINGEN_BLAD)))
+        # Eigen (bewaarde) instellingen blijven actief; die van de werkmap kun je overnemen. Eerste keer: die van de werkmap.
+        blad = bladen.get(rc.INSTELLINGEN_BLAD)
+        self.werkmap_instellingen = rc.instellingen_waarden(blad) if blad else None
+        self.knop_uit_werkmap.setEnabled(self.werkmap_instellingen is not None)
+        anders = self.verschil(self.werkmap_instellingen) if self.werkmap_instellingen else []
+        if anders and not self.bewaarde_instellingen():
+            self.instellingen.zet(self.werkmap_instellingen)
+            anders = []
         self.lbl_bestand.setText(Path(pad).name)
         self.toon_samenvatting()
         n = max(0, len(bladen.get(self.instellingen.waarden()["blad_studenten"], [])) - 1)
         self.lbl_bestand_info.setText(f"{n} rijen studenten · {len(bladen)} bladen")
         self.toon_leeg()
-        self.statusBar().showMessage(f"Geopend: {pad}")
+        if anders:
+            self.statusBar().showMessage(f"Geopend: {Path(pad).name}. Je eigen instellingen zijn actief; de werkmap heeft "
+                                         f"andere ({', '.join(anders[:3])}{' …' if len(anders) > 3 else ''}). "
+                                         "Overnemen kan op de pagina Instellingen.")
+        else:
+            self.statusBar().showMessage(f"Geopend: {pad}")
         return True
 
     def maak(self) -> dict:
@@ -524,6 +551,30 @@ class Venster(QMainWindow):
                                      f"{blad} gezet. Maak het rooster opnieuw; ‘Excel opslaan’ bewaart het blad.")
         return True
 
+    def bewaarde_instellingen(self) -> dict | None:
+        try:
+            w = json.loads(self.opslag.value("instellingen", "") or "null")
+        except ValueError:
+            return None
+        return w if isinstance(w, dict) else None
+
+    def bewaar_instellingen(self, *_):
+        self.opslag.setValue("instellingen", json.dumps(self.instellingen.waarden()))
+        self.opslag.sync()
+
+    def verschil(self, ruw: dict) -> list:
+        """Labels van instellingen die in `ruw` (bijv. uit een werkmap) anders zijn dan nu in het formulier."""
+        nu = rc.lees_instellingen(rc.instellingen_matrix(self.instellingen.waarden()), [])
+        daar = rc.lees_instellingen(rc.instellingen_matrix(ruw), [])
+        return [i["label"] for i in rc.INSTELLINGEN if nu[i["sleutel"]] != daar[i["sleutel"]]]
+
+    def instellingen_uit_werkmap(self) -> bool:
+        if not self.werkmap_instellingen:
+            return False
+        self.instellingen.zet(self.werkmap_instellingen)
+        self.statusBar().showMessage("Instellingen uit de werkmap overgenomen.")
+        return True
+
     def alles_wissen(self, vraag: bool = True) -> bool:
         """Werkmap sluiten en alles in het programma terugzetten. Het Excel-bestand zelf wordt niet aangeraakt."""
         if vraag and QMessageBox.question(
@@ -533,6 +584,8 @@ class Venster(QMainWindow):
             return False
         self.pad, self.bladen, self.resultaat, self.ingevoerd = None, None, None, {}
         self.instellingen.herstel()
+        self.werkmap_instellingen = None
+        self.knop_uit_werkmap.setEnabled(False)
         for t in (self.tabel_rooster, self.tabel_uitdraai, self.tabel_meldingen):
             t.clear(), t.setRowCount(0), t.setColumnCount(0)
         self.tabs.setTabText(2, "Meldingen")
@@ -590,6 +643,8 @@ class Venster(QMainWindow):
 def controle(invoer: str, map_: str) -> int:
     """Zelftest zonder vensters (ook voor het gebouwde programma): --controle WERKMAP UITVOERMAP."""
     app = QApplication.instance() or QApplication(sys.argv)  # noqa: F841
+    import tempfile
+    QSettings.setPath(QSettings.IniFormat, QSettings.UserScope, tempfile.mkdtemp())  # zelftest raakt eigen instellingen niet
     v = Venster()
     if not v.open(invoer):
         return 2

@@ -243,3 +243,42 @@ def test_simus_vast_lokaal_in_app(tmp_path):
     # importeren daarna houdt 'Vast lokaal' per naam vast
     nieuw = uitvoer.simu_blad_met(uit, 46371, [{"naam": "Siem", "van": None, "tot": None}, {"naam": "Nieuw", "van": None, "tot": None}])
     assert [r_[4:6] for r_ in nieuw[1:]] == [["C2", ""], ["", ""]]
+
+
+def test_instellingen_blijven_bewaard_na_afsluiten(tmp_path):
+    app = roosterapp.QApplication.instance() or roosterapp.QApplication([])  # noqa: F841
+    v = roosterapp.Venster()
+    v.instellingen.velden["duur1"].setValue(25)
+    v.instellingen.velden["simu_rotatie"].setCurrentText("Na elke toets")
+    v.instellingen.velden["pauzes"].setText("12:00-12:30")
+    v.close()
+    w = roosterapp.Venster()  # programma opnieuw gestart
+    assert w.instellingen.waarden()["duur1"] == 25 and w.instellingen.waarden()["simu_rotatie"] == "Na elke toets"
+    assert w.instellingen.waarden()["pauzes"] == "12:00-12:30"
+
+
+def test_werkmap_met_andere_instellingen_overschrijft_eigen_instellingen_niet(tmp_path, monkeypatch):
+    bron = tmp_path / "werkmap.xlsx"
+    mv.schrijf(bron)  # werkmap met eigen blad Instellingen (standaard: toets 15 min)
+    app = roosterapp.QApplication.instance() or roosterapp.QApplication([])  # noqa: F841
+    v = roosterapp.Venster()
+    v.instellingen.velden["duur1"].setValue(25)
+    v.open(str(bron))
+    assert v.instellingen.waarden()["duur1"] == 25  # eigen instelling blijft
+    assert "Je eigen instellingen zijn actief" in v.statusBar().currentMessage() and v.knop_uit_werkmap.isEnabled()
+    assert v.instellingen_uit_werkmap() and v.instellingen.waarden()["duur1"] == 15
+    assert roosterapp.Venster().instellingen.waarden()["duur1"] == 15  # en dat wordt ook weer bewaard
+    monkeypatch.setattr(roosterapp.QMessageBox, "question", lambda *a, **k: roosterapp.QMessageBox.Yes)
+    v.instellingen.velden["duur1"].setValue(30)
+    assert v.alles_wissen() and roosterapp.Venster().instellingen.waarden() == rc.STANDAARD
+
+
+def test_eerste_keer_neemt_instellingen_van_werkmap(tmp_path):
+    bron = tmp_path / "werkmap.xlsx"
+    b = mv.dag_bladen()
+    b["Instellingen"] = rc.instellingen_matrix({"duur1": 22})
+    mv.schrijf(bron, b)
+    app = roosterapp.QApplication.instance() or roosterapp.QApplication([])  # noqa: F841
+    v = roosterapp.Venster()  # nog niets bewaard
+    v.open(str(bron))
+    assert v.instellingen.waarden()["duur1"] == 22
