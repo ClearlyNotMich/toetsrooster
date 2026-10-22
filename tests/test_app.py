@@ -65,9 +65,10 @@ def test_wijziging_na_maken_vraagt_opnieuw_maken(tmp_path):
     v.open(str(bron))
     v.maak()
     assert v.knop_pdf.isEnabled()
-    v.modus_groep.buttons()[1].setChecked(True)
+    v.instellingen.velden["duur1"].setValue(20)  # een instelling wijzigen: eerst opnieuw maken
     assert not v.knop_pdf.isEnabled() and not v.knop_opslaan.isEnabled()
-    assert v.maak()["modus"] == "her" and v.knop_pdf.isEnabled()
+    v.modus_groep.buttons()[1].setChecked(True)  # andere toets kiezen: rooster wordt meteen gemaakt
+    assert v.resultaat["modus"] == "her" and v.knop_pdf.isEnabled()
 
 
 def test_instellingen_formulier_heen_en_terug():
@@ -159,20 +160,16 @@ def test_vrije_plekken_niet_in_pdf(tmp_path):
     assert rc.VRIJ not in html and html.count("<tr>") == 61 + 61 + 5 + 1  # 5 lokaalpagina's met kop, 1 uitdraaikop
 
 
-def test_concept_laden_en_import_zonder_passende_kolom(tmp_path):
+def test_concept_in_werkmap_en_import_zonder_passende_kolom(tmp_path):
     bron = tmp_path / "werkmap.xlsx"
-    mv.schrijf(bron)
-    concept = tmp_path / "concept.xlsx"
-    from openpyxl import Workbook
-    wb = Workbook()
-    for rij in mv.concept_blad():
-        wb.active.append([None if c == "" else c for c in rij])
-    wb.save(concept)
+    bladen = mv.dag_bladen()
+    bladen["Concept"] = mv.concept_blad()  # lijstvorm als extra blad in de werkmap
+    mv.schrijf(bron, bladen)
     beschikbaarheid(tmp_path / "b.xlsx")
     app = roosterapp.QApplication.instance() or roosterapp.QApplication([])  # noqa: F841
     v = roosterapp.Venster()
     v.open(str(bron))
-    assert v.laad_concept(str(concept)) and "Concept 15-12-2026 · 7 lokalen" in v.samenvatting.text()
+    assert "Concept 15-12-2026 · 7 lokalen" in v.samenvatting.text()
     gezien = {}
 
     def kies(dlg):  # 15-12 staat niet in het overzicht: niets voorgevinkt, OK uit
@@ -185,7 +182,38 @@ def test_concept_laden_en_import_zonder_passende_kolom(tmp_path):
     r = v.maak()
     assert r["fouten"] == [] and v.stat_in.waarde.text() == "61 / 61"
     assert {rij[2] for rij in r["bladen"]["Rooster_Kans1"][1:]} == {"A1", "A2", "B1", "B2", "C1", "Praktijkhuis", "C2"}
-    assert "Concept" in rc.lees_werkmap(v.opslaan(str(tmp_path / "uit.xlsx")))
+
+
+def test_wisselen_van_toets_houdt_alles_en_alles_wissen(tmp_path, monkeypatch):
+    bron = tmp_path / "werkmap.xlsx"
+    mv.schrijf(bron)
+    beschikbaarheid(tmp_path / "b.xlsx")
+    app = roosterapp.QApplication.instance() or roosterapp.QApplication([])  # noqa: F841
+    v = roosterapp.Venster()
+    v.open(str(bron))
+    v.instellingen.velden["simu_rotatie"].setCurrentText("Na elke toets")
+    assert v.importeer_simus(str(tmp_path / "b.xlsx"), lambda dlg: True)
+    v.maak()
+    v.modus.groep.buttons()[1].click()  # naar Herkansing: meteen een rooster, werkmap en import blijven
+    assert v.resultaat and v.resultaat["modus"] == "her" and v.kaart_stapel.currentIndex() == 1
+    assert v.bladen is not None and "Simu" in v.ingevoerd
+    assert v.instellingen.waarden()["simu_rotatie"] == "Na elke toets"
+    v.modus.groep.buttons()[0].click()
+    assert v.resultaat["modus"] == "kans1" and v.knop_opslaan.isEnabled()
+    monkeypatch.setattr(roosterapp.QMessageBox, "question", lambda *a, **k: roosterapp.QMessageBox.No)
+    assert not v.alles_wissen() and v.bladen is not None  # 'Nee': er gebeurt niets
+    monkeypatch.setattr(roosterapp.QMessageBox, "question", lambda *a, **k: roosterapp.QMessageBox.Yes)
+    assert v.alles_wissen()
+    assert v.bladen is None and v.resultaat is None and v.ingevoerd == {} and v.instellingen.waarden() == rc.STANDAARD
+    assert v.lbl_bestand.text() == "Geen werkmap geopend" and not v.knop_maak.isEnabled() and not v.knop_wissen.isEnabled()
+    assert v.tabel_rooster.rowCount() == 0 and bron.exists()
+
+
+def test_nieuwe_werkmap_wordt_meteen_geopend(tmp_path):
+    app = roosterapp.QApplication.instance() or roosterapp.QApplication([])  # noqa: F841
+    v = roosterapp.Venster()
+    doel = v.sjabloon(str(tmp_path / "nieuw.xlsx"))
+    assert doel and v.pad == doel and v.lbl_bestand.text() == "nieuw.xlsx"
 
 
 def test_simus_vast_lokaal_in_app(tmp_path):

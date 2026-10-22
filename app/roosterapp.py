@@ -28,7 +28,7 @@ HULP = """
 <style>li { margin-bottom: 6px; } h3 { margin-top: 18px; }</style>
 <h3>Zo maak je een rooster</h3>
 <ol>
-<li>Vul de werkmap. Nog geen werkmap? Kies Nieuw sjabloon in de zijbalk.
+<li>Vul de werkmap. Nog geen werkmap? Kies Nieuwe werkmap in de zijbalk.
   <ul>
   <li>Studenten: één rij per student. Vul eventueel TTV, Voorkeur, Opmerkingen en IsHerkanser in.
       Bij Niet inroosteren bij zet je de docenten die een student niet mag krijgen.</li>
@@ -37,7 +37,7 @@ HULP = """
   <li>Simu: één rij per simu per dag. Je kunt ze ook overnemen met Simu's importeren.
       Met Simucliënten stel je per simu een vast lokaal en Kan spelen in.</li>
   <li>Een casus die een keuken nodig heeft? Zet het tussen haakjes, bijvoorbeeld C1.36 (keuken) en K3 (keuken).</li>
-  <li>Liever een lijst, zoals op papier? Dat kan ook. Haal die binnen met Concept laden.</li>
+  <li>Liever een lijst, zoals op papier? Zet die als extra blad in de werkmap. Zie de README.</li>
   </ul></li>
 <li>Open de werkmap. Download hem eerst uit OneDrive of SharePoint.</li>
 <li>Kijk de instellingen na: tijden, toetsduur, pauzes en wanneer simu's van lokaal wisselen.</li>
@@ -113,7 +113,7 @@ class Venster(QMainWindow):
         self.nav.buttons()[0].setChecked(True)
         self.statusBar().showMessage("Open een werkmap om te beginnen.")
         self.instellingen.gewijzigd.connect(self.verouderd)
-        self.modus.gewijzigd.connect(self.verouderd)
+        self.modus.gewijzigd.connect(self.andere_toets)
         self.toon_samenvatting()
         self.toon_leeg()
 
@@ -148,18 +148,13 @@ class Venster(QMainWindow):
         self.lbl_bestand_info = label("", "uitleg", wrap=True)
         lay.addWidget(self.lbl_bestand_info)
         lay.addSpacing(8)
+        nieuw = QPushButton("Nieuwe werkmap…", cursor=Qt.PointingHandCursor)
+        nieuw.setToolTip("Lege werkmap met de juiste bladen en kolommen om zelf in te vullen.")
+        nieuw.clicked.connect(lambda: self.sjabloon())
+        lay.addWidget(nieuw)
         open_ = QPushButton("Werkmap openen…", cursor=Qt.PointingHandCursor)
         open_.clicked.connect(self.kies_bestand)
         lay.addWidget(open_)
-        sjabloon = QPushButton("Nieuw sjabloon…", cursor=Qt.PointingHandCursor)
-        sjabloon.setToolTip("Lege werkmap met de juiste bladen en kolommen om zelf in te vullen.")
-        sjabloon.clicked.connect(self.sjabloon)
-        lay.addWidget(sjabloon)
-        self.knop_concept = QPushButton("Concept laden…", cursor=Qt.PointingHandCursor)
-        self.knop_concept.setToolTip("Toetsdag in lijstvorm (datum, inzet, tijden, pauzes, lokalen, casussen, simu's) "
-                                     "uit een ander bestand in deze werkmap zetten.")
-        self.knop_concept.clicked.connect(lambda: self.laad_concept())
-        lay.addWidget(self.knop_concept)
         self.knop_import = QPushButton("Simu's importeren…", cursor=Qt.PointingHandCursor)
         self.knop_import.setToolTip("Simucliënten voor de toetsdag overnemen uit het overzicht ‘Beschikbaarheid simu's’.")
         self.knop_import.clicked.connect(lambda: self.importeer_simus())
@@ -168,6 +163,12 @@ class Venster(QMainWindow):
         self.knop_simus.setToolTip("Per simucliënt kiezen: wisselt van lokaal, of blijft vast in een lokaal.")
         self.knop_simus.clicked.connect(lambda: self.simus_instellen())
         lay.addWidget(self.knop_simus)
+        lay.addSpacing(8)
+        self.knop_wissen = QPushButton("Alles wissen", objectName="link", cursor=Qt.PointingHandCursor)
+        self.knop_wissen.setToolTip("Werkmap sluiten en alle ingevoerde en gemaakte gegevens in het programma wissen. "
+                                    "Je Excel-bestand blijft ongewijzigd.")
+        self.knop_wissen.clicked.connect(lambda: self.alles_wissen())
+        lay.addWidget(self.knop_wissen, 0, Qt.AlignHCenter)
         return z
 
     def _rooster_pagina(self) -> QWidget:
@@ -309,14 +310,14 @@ class Venster(QMainWindow):
         self.leeg_titel.setText("Klaar om te roosteren" if open_ else "Nog geen werkmap geopend")
         self.leeg_tekst.setText("Controleer de instellingen en klik op ‘Rooster maken’." if open_ else
                                 "Open de Excel-werkmap met studenten, de toetsdag en de simucliënten,\n"
-                                "of begin met een nieuw sjabloon.")
+                                "of begin met een nieuwe werkmap.")
         self.leeg_knop.setVisible(not open_)
         self.kaart_stapel.setCurrentIndex(0)
         for s in (self.stat_in, self.stat_waarsch, self.stat_niet):
             s.zet("–")
         self.knop_maak.setEnabled(open_)
         self.knop_import.setEnabled(open_)
-        self.knop_concept.setEnabled(open_)
+        self.knop_wissen.setEnabled(open_)
         self.knop_simus.setEnabled(open_)
         for k in (self.knop_opslaan, self.knop_pdf, self.knop_pdf_rooster):
             k.setEnabled(False)
@@ -345,6 +346,12 @@ class Venster(QMainWindow):
                     item.setForeground(QColor(KLEUR["gedempt_tekst"]))
                 tabel.setItem(r, c, item)
         tabel.resizeColumnsToContents()
+
+    def andere_toets(self, *_):
+        """Eerste kans <-> herkansing: werkmap, import en instellingen blijven; het rooster wordt meteen gemaakt."""
+        self.toon_samenvatting()
+        if self.bladen is not None:
+            self.maak()
 
     def verouderd(self, *_):
         self.toon_samenvatting()
@@ -517,32 +524,24 @@ class Venster(QMainWindow):
                                      f"{blad} gezet. Maak het rooster opnieuw; ‘Excel opslaan’ bewaart het blad.")
         return True
 
-    def laad_concept(self, pad: str | None = None) -> bool:
-        """Conceptblad uit een ander bestand in de open werkmap zetten (als blad 'Concept')."""
-        if not pad:
-            pad, _ = QFileDialog.getOpenFileName(self, "Concept openen", str(Path(self.pad).parent), "Excel-werkmap (*.xlsx *.xlsm)")
-        if not pad:
+    def alles_wissen(self, vraag: bool = True) -> bool:
+        """Werkmap sluiten en alles in het programma terugzetten. Het Excel-bestand zelf wordt niet aangeraakt."""
+        if vraag and QMessageBox.question(
+                self, "Alles wissen?", "De werkmap wordt gesloten en alles wat je hier hebt ingevoerd of gemaakt wordt "
+                "gewist (geïmporteerde simu's, instellingen, rooster). Je Excel-bestand blijft ongewijzigd.\n\n"
+                "Niet opgeslagen werk gaat verloren.") != QMessageBox.Yes:
             return False
-        try:
-            bron = rc.lees_werkmap(pad)
-        except Exception as e:  # noqa: BLE001
-            QMessageBox.critical(self, "Kan concept niet openen", f"{pad}\n\n{e}")
-            return False
-        naam = rc.vind_concept(bron)
-        if not naam:
-            QMessageBox.warning(self, "Geen concept gevonden", "Geen blad met in kolom A de kopjes ‘lokalen’ en ‘tijden’ "
-                                "(of ‘inzet’), met de waarden eronder in kolom B.")
-            return False
-        # Het nieuwe concept vooraan, zodat het voor eventuele oudere conceptbladen gaat.
-        self.bladen = {"Concept": bron[naam], **{k: v for k, v in self.bladen.items() if k != "Concept"}}
-        self.ingevoerd["Concept"] = bron[naam]
-        for k, v in bron.items():  # studenten of simu's uit het conceptbestand alleen als ze hier nog ontbreken
-            if k != naam and rc.heeft_data(v) and not rc.heeft_data(self.bladen.get(k)):
-                self.bladen[k] = self.ingevoerd[k] = v
-        self.verouderd()
-        c = self.concept()
-        self.statusBar().showMessage(f"Concept geladen uit {Path(pad).name}" + (f" ({rc.datum_tekst(c['d'])})" if c and c["d"] else "")
-                                     + ". Maak het rooster opnieuw; ‘Excel opslaan’ bewaart het als blad ‘Concept’.")
+        self.pad, self.bladen, self.resultaat, self.ingevoerd = None, None, None, {}
+        self.instellingen.herstel()
+        for t in (self.tabel_rooster, self.tabel_uitdraai, self.tabel_meldingen):
+            t.clear(), t.setRowCount(0), t.setColumnCount(0)
+        self.tabs.setTabText(2, "Meldingen")
+        self.lbl_bestand.setText("Geen werkmap geopend")
+        self.lbl_bestand_info.setText("")
+        self.toon_leeg()
+        self.toon_samenvatting()
+        self.nav.button(0).click()
+        self.statusBar().showMessage("Alles gewist. Open een werkmap om te beginnen.")
         return True
 
     def lokalen(self) -> list:
@@ -574,11 +573,17 @@ class Venster(QMainWindow):
 
     def sjabloon(self, doel: str | None = None) -> str | None:
         if not doel:
-            doel, _ = QFileDialog.getSaveFileName(self, "Nieuw sjabloon", "Toetsrooster sjabloon.xlsx", "Excel-werkmap (*.xlsx)")
+            doel, _ = QFileDialog.getSaveFileName(self, "Nieuwe werkmap", "Toetsrooster.xlsx", "Excel-werkmap (*.xlsx)")
         if not doel:
             return None
-        uitvoer.maak_sjabloon(doel)
-        self.statusBar().showMessage(f"Sjabloon opgeslagen: {doel} — vul het in en open het daarna hier.")
+        try:
+            uitvoer.maak_sjabloon(doel)
+        except Exception as e:  # noqa: BLE001
+            QMessageBox.critical(self, "Kan werkmap niet maken", f"{doel}\n\n{e}")
+            return None
+        self.open(doel)
+        self.statusBar().showMessage(f"Nieuwe werkmap gemaakt en geopend: {doel}. Vul hem in Excel in en open hem daarna "
+                                     "opnieuw met ‘Werkmap openen…’.")
         return doel
 
 

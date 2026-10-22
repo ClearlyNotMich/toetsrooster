@@ -85,7 +85,7 @@ Zo wordt het gelezen:
 - De tijden en pauzes uit de lijst gaan voor de instellingen.
 - Bij 7 x worden de eerste zeven simu's van die dag gebruikt.
 
-Staat zo'n lijst in de werkmap, dan gaat die voor het blad Toetsdag. In het programma haal je een lijst uit een ander bestand binnen met Concept laden.
+Zet de lijst als extra blad in de werkmap. Staat er zo'n lijst in, dan gaat die voor het blad Toetsdag.
 
 ## Datums
 

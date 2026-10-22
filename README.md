@@ -35,7 +35,7 @@ Instellingen: dit blad wordt vanzelf gemaakt. Hier staan onder andere:
 - of simu's na elke pauze, na elke toets of nooit van lokaal wisselen;
 - of lokalen evenredig worden gevuld (standaard), zodat elke beoordelaar aan de beurt komt.
 
-Liever een lijst, zoals je het op papier opschrijft? Dat kan ook. Zet in kolom A de kopjes datum, inzet, tijden, pauzes, lokalen, casussen en simu's, en in kolom B de waarden eronder. Zie [docs/REGELS.md](docs/REGELS.md).
+Liever een lijst, zoals je het op papier opschrijft? Dat kan ook. Zet een extra blad in de werkmap met in kolom A de kopjes datum, inzet, tijden, pauzes, lokalen, casussen en simu's, en in kolom B de waarden eronder. Zie [docs/REGELS.md](docs/REGELS.md).
 
 ## Wat je terugkrijgt
 
@@ -59,13 +59,14 @@ Op Windows kan een waarschuwing verschijnen, omdat het programma niet onderteken
 
 ### Stappen
 
-1. Nog geen werkmap? Kies Nieuw sjabloon. Je krijgt dan een lege werkmap met alle bladen en kolommen.
+1. Nog geen werkmap? Kies Nieuwe werkmap. Je krijgt dan een lege werkmap met alle bladen en kolommen.
 2. Kies Werkmap openen en open je Excel-bestand. Download het eerst uit OneDrive of SharePoint.
-3. Staat de toetsdag in een lijst in een ander bestand? Kies Concept laden.
-4. Kies Simu's importeren om simu's over te nemen uit het overzicht Beschikbaarheid simu's. Met Simucliënten stel je per simu het vaste lokaal en Kan spelen in.
-5. Kijk de instellingen na.
-6. Kies Eerste kans of Herkansing en klik op Rooster maken.
-7. Sla het resultaat op als Excel of pdf. Je originele bestand blijft altijd ongewijzigd.
+3. Kies Simu's importeren om simu's over te nemen uit het overzicht Beschikbaarheid simu's. Met Simucliënten stel je per simu het vaste lokaal en Kan spelen in.
+4. Kijk de instellingen na.
+5. Kies Eerste kans of Herkansing en klik op Rooster maken. Wissel je daarna van toets, dan wordt dat rooster meteen gemaakt. De werkmap en je instellingen blijven staan.
+6. Sla het resultaat op als Excel of pdf. Je originele bestand blijft altijd ongewijzigd.
+
+Wil je opnieuw beginnen? Kies Alles wissen onderaan de zijbalk. Het programma vergeet dan de werkmap, de geïmporteerde simu's, de instellingen en het rooster. Je Excel-bestand blijft gewoon staan.
 
 De pagina Hulp in het programma legt hetzelfde uit.
 
