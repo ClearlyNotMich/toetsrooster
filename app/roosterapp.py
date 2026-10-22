@@ -60,7 +60,7 @@ HULP = """
   </ul></li>
 </ol>
 <h3>Liever in Excel Online?</h3>
-<p>De knoppen op het eerste blad van de werkmap doen hetzelfde (zie LEESMIJ). Ze gebruiken het blad
+<p>De knoppen op het eerste blad van de werkmap doen hetzelfde (zie de README op GitHub). Ze gebruiken het blad
 <i>Instellingen</i>; de app schrijft jouw instellingen daarin bij <i>Excel opslaan</i>.</p>
 <h3>Iets klopt niet?</h3>
 <p>Studenten die niet passen staan onderaan het rooster als <i>NIET INGEROOSTERD</i> en in <i>Meldingen</i>.
