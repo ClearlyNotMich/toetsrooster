@@ -64,6 +64,10 @@ INSTELLINGEN = [
     _inst("start", "Toetsdag", "Eerste toets om", "tijd", "09:40", "Begintijd van de eerste student."),
     _inst("eind", "Toetsdag", "Laatste toets klaar om", "tijd", "17:00", "Geen toets loopt later door dan deze tijd."),
     _inst("wissel", "Toetsdag", "Wisseltijd (min)", "getal", 5, "Tijd tussen twee studenten.", min_=0, max_=120),
+    _inst("verdelen", "Toetsdag", "Lokalen vullen", "keuze", "Evenredig",
+          "Evenredig: op elk tijdstip eerst het lokaal met de minste studenten, zodat elk lokaal (en elke beoordelaar) "
+          "ongeveer evenveel krijgt, ook als er minder simu's dan lokalen zijn. Op volgorde: eerst de bovenste lokalen.",
+          ["Evenredig", "Op volgorde"]),
     _inst("jaar", "Toetsduur", "Jaar", "getal", 1, "Studiejaar van deze toets; bepaalt welke duur hieronder geldt.", min_=1, max_=2),
     _inst("duur1", "Toetsduur", "Toetsduur jaar 1 (min)", "getal", 15, "Gewone toets in jaar 1.", min_=1, max_=480),
     _inst("ttv1", "Toetsduur", "TTV-toetsduur jaar 1 (min)", "getal", 20, "Toets met tijdverlenging in jaar 1.", min_=1, max_=480),
@@ -497,11 +501,14 @@ def meld_koppeling(lokalen: list, casussen: list, eisen: list, uit: list, d, mel
 
 def lees_toetsdag(matrix: list, blad: str, s: dict, fouten: list, meldingen: list) -> tuple[list, dict]:
     """Blad Toetsdag (één rij per lokaal per dag) -> slots en beschikbare beoordelaars per slot.
+    Beoordelaar, Beoordelaar 2, 3, …: per slot de eerste die dan kan. Tijden in de cel ('Fien tot 13.00',
+    'Dorus 10.00-12.00') of met 'Wissel om' tussen beoordelaar 1 en 2.
     Kenmerken tussen haakjes: 'C1.36 (keuken)' en casus 'K3 (keuken)' -> die casus (met beoordelaar) gaat naar dat lokaal."""
     kop = list(matrix[0])
     kd, kl, kb = kolom(kop, "datum"), kolom(kop, "lokaal"), kolom(kop, "beoordelaar")
     kc, kn, kv = kolom(kop, "casus"), kolom(kop, "casusnapauze"), kolom(kop, "vaardigheid")
-    kb2, kw = kolom(kop, "beoordelaar2"), kolom(kop, "wisselom")
+    kw = kolom(kop, "wisselom")
+    kbs = [kb] + [i for i, k in enumerate(kop) if re.fullmatch(r"beoordelaar\d+", norm(k))]
     if min(kd, kl, kb) < 0:
         fouten.append(f"Blad '{blad}': kolommen 'Datum', 'Lokaal' en 'Beoordelaar' zijn verplicht.")
         return [], {}
@@ -509,22 +516,29 @@ def lees_toetsdag(matrix: list, blad: str, s: dict, fouten: list, meldingen: lis
     for i, rij in enumerate(matrix[1:], start=1):
         if leeg(rij):
             continue
-        d, lokaal, naam = naar_datum(cel(rij, kd)), kenmerken(cel(rij, kl)), tekst(cel(rij, kb))
-        naam2, w = tekst(cel(rij, kb2)), naar_minuten(cel(rij, kw)) if tekst(cel(rij, kw)) else None
-        if d is None or not lokaal[0] or not naam:
+        d, lokaal = naar_datum(cel(rij, kd)), kenmerken(cel(rij, kl))
+        wie = [lees_inzet(tekst(cel(rij, k)), s["middag"]) for k in kbs if tekst(cel(rij, k))]
+        w = naar_minuten(cel(rij, kw)) if tekst(cel(rij, kw)) else None
+        if d is None or not lokaal[0] or not wie:
             fouten.append(f"Blad '{blad}' rij {i + 1}: vul een geldige datum ({DATUM_VOORBEELD}; nu "
                           f"'{tekst(cel(rij, kd))}'), een lokaal en een beoordelaar in.")
             continue
-        if bool(naam2) != (w is not None):
-            fouten.append(f"Blad '{blad}' rij {i + 1}: vul 'Beoordelaar 2' en 'Wissel om' (een tijd) allebei in, "
-                          "of laat beide leeg.")
+        if tekst(cel(rij, kw)) and (w is None or len(wie) < 2):
+            fouten.append(f"Blad '{blad}' rij {i + 1}: 'Wissel om' moet een tijd zijn en vraagt ook een 'Beoordelaar 2'.")
+            continue
+        if w is not None:  # wissel: beoordelaar 1 tot w, beoordelaar 2 vanaf w (tenzij in de cel al een tijd staat)
+            wie[0]["tot"] = wie[0]["tot"] if wie[0]["tot"] is not None else w
+            wie[1]["van"] = wie[1]["van"] if wie[1]["van"] is not None else w
+        elif len(wie) > 1 and all(p["van"] is None and p["tot"] is None for p in wie):
+            fouten.append(f"Blad '{blad}' rij {i + 1}: bij meer beoordelaars in één lokaal: vul 'Wissel om' in, of zet "
+                          "tijden in de cel (bijv. 'Fien tot 13.00' en 'Hans vanaf 13.30').")
             continue
         if f"{d}_{norm(lokaal[0])}" in gezien:
             fouten.append(f"Blad '{blad}' rij {i + 1}: lokaal {lokaal[0]} staat al eerder op {datum_tekst(d)}.")
             continue
         gezien.append(f"{d}_{norm(lokaal[0])}")
         eenheden.append({"d": d, "lokaal": lokaal, "casus": kenmerken(cel(rij, kc)), "casus_na": kenmerken(cel(rij, kn)),
-                         "vaardigheid": tekst(cel(rij, kv)), "naam": naam, "naam2": naam2, "w": w})
+                         "vaardigheid": tekst(cel(rij, kv)), "wie": wie})
     slots, beo = [], {}
     tijden = tijdgrid(s)
     for d in list(dict.fromkeys(e["d"] for e in eenheden)):
@@ -538,12 +552,30 @@ def lees_toetsdag(matrix: list, blad: str, s: dict, fouten: list, meldingen: lis
             if e["casus_na"][1] and not past_bij(e["casus_na"][1], kamer[1]):
                 meldingen.append(("Waarschuwing", f"Casus na pauze {e['casus_na'][0]} vraagt {', '.join(e['casus_na'][1])}, "
                                   f"maar lokaal {kamer[0]} heeft dat niet."))
+            e["kamer"] = kamer[0]
             for t in tijden:
                 slots.append({"n": len(slots), "d": d, "t": t, "lokaal": kamer[0], "casus": e["casus"][0],
                               "casus_na": e["casus_na"][0], "vaardigheid": e["vaardigheid"]})
-                beo[f"{d}_{t}_{norm(kamer[0])}"] = [{"naam": e["naam2"] if e["naam2"] and t >= e["w"] else e["naam"],
-                                                    "casus": "", "lokaal": ""}]
+                past_ = [p for p in e["wie"] if (p["van"] is None or p["van"] <= t) and (p["tot"] is None or t + s["duur"] <= p["tot"])]
+                if past_:
+                    beo[f"{d}_{t}_{norm(kamer[0])}"] = [{"naam": past_[0]["naam"], "casus": "", "lokaal": ""}]
+        meld_dubbel_ingezet(rijen, s, d, meldingen)
     return slots, beo
+
+
+def meld_dubbel_ingezet(rijen: list, s: dict, d: int, meldingen: list) -> None:
+    """Waarschuwing als een beoordelaar op dezelfde tijd in twee lokalen staat (bijv. bij ruilen)."""
+    inzet = []
+    for e in rijen:
+        for p in e["wie"]:
+            a = p["van"] if p["van"] is not None else s["start"]
+            b = p["tot"] if p["tot"] is not None else s["eind"]
+            for naam, k, x, y in inzet:
+                if naam == norm(p["naam"]) and k != e["kamer"] and a < y and x < b:
+                    meldingen.append(("Waarschuwing", f"{p['naam']} staat op {datum_tekst(d)} van {tijd_tekst(max(a, x))} tot "
+                                      f"{tijd_tekst(min(b, y))} in twee lokalen ({k} en {e['kamer']}); hij of zij kan maar "
+                                      "in één tegelijk beoordelen."))
+            inzet.append((norm(p["naam"]), e["kamer"], a, b))
 
 
 def lees_simu_dag(matrix: list, blad: str, fouten: list, meldingen: list) -> list:
@@ -700,20 +732,28 @@ def vind_concept(bladen: dict) -> str:
 
 
 def lees_inzet(t: str, middag: int) -> dict:
-    """'Fien ochtend tot 13.00' -> naam Fien, tot 13:00; 'Jet (nog niet eerder gedaan)' -> opmerking."""
+    """'Fien ochtend tot 13.00' -> naam Fien, tot 13:00; 'Dorus 10.00-12.00' of 'Dorus van 10.00 tot 12.00' -> van/tot;
+    'Jet (nog niet eerder gedaan)' -> opmerking. 'Ida van Berkel' blijft gewoon een naam."""
     laag = t.lower()
     tijd = r"(\d{1,2}(?:[.:]\d{2})?)"
     uur = lambda x: naar_minuten(x if re.search(r"[.:]", x) else x + ":00")  # noqa: E731
+    bereik = re.search(r"(\d{1,2}[.:]\d{2})\s*[-–]\s*(\d{1,2}[.:]\d{2})", laag)
     tot = re.search(r"\btot\s+" + tijd, laag)
-    van = re.search(r"\b(?:vanaf|va)\s+" + tijd, laag)
+    van = re.search(r"\b(?:vanaf|va|van)\s+" + tijd, laag)
     opm = re.search(r"\(([^)]*)\)", t)
-    naam = re.split(r"\s*(?:\(|,|\b(?:ochtend|middag|tot|vanaf|va)\b)", t, maxsplit=1, flags=re.IGNORECASE)[0].strip()
+    naam = re.split(r"\s*(?:\(|,|\b(?:ochtend|middag|tot|vanaf|va)\b|\bvan\s+\d|\d{1,2}[.:]\d{2})", t, maxsplit=1,
+                    flags=re.IGNORECASE)[0].strip()
+    if bereik:
+        return {"naam": naam or t.strip(), "tekst": t.strip(), "opm": opm[1].strip() if opm else "",
+                "van": uur(bereik[1]), "tot": uur(bereik[2])}
     return {"naam": naam or t.strip(), "tekst": t.strip(), "opm": opm[1].strip() if opm else "",
             "tot": uur(tot[1]) if tot else (middag if heeft_woord(laag, "ochtend") else None),
             "van": uur(van[1]) if van else (middag if heeft_woord(laag, "middag") else None)}
 
 
 def wie_tekst(p: dict) -> str:
+    if p["van"] is not None and p["tot"] is not None:
+        return f"{p['naam']} ({tijd_tekst(p['van'])}-{tijd_tekst(p['tot'])})"
     return p["naam"] + (f" (tot {tijd_tekst(p['tot'])})" if p["tot"] is not None else "") + \
         (f" (vanaf {tijd_tekst(p['van'])})" if p["van"] is not None else "")
 
@@ -770,12 +810,18 @@ def lees_concept(matrix: list, blad: str, s: dict, fouten: list, meldingen: list
     if len(casus) != len(lokalen):
         meldingen.append(("Waarschuwing", f"Blad '{blad}': {len(lokalen)} lokalen maar {len(casus)} casussen; "
                           "ze worden op volgorde gekoppeld."))
-    # beoordelaars: hele dag op volgorde, dan ochtend+middag als koppel, opmerking tussen haakjes = reserve
+    # beoordelaars: hele dag op volgorde; wie maar een deel van de dag kan, vormt op tijdvolgorde een keten in één
+    # lokaal (ochtend -> middag, of 10-12 -> 12-15 -> ...); opmerking tussen haakjes zonder tijd = reserve
     inzet = [lees_inzet(tekst(v), s["middag"]) for v in waarden.get("inzet", [])]
     heel = [p for p in inzet if p["tot"] is None and p["van"] is None and not p["opm"]]
-    ochtend = [p for p in inzet if p["tot"] is not None and p["van"] is None]
-    middag = [p for p in inzet if p["van"] is not None and p["tot"] is None]
-    koppels = [[a, b] for a, b in zip(ochtend, middag)]
+    deels = [p for p in inzet if p["tot"] is not None or p["van"] is not None]
+    koppels: list = []
+    for p in sorted(deels, key=lambda q: (q["van"] if q["van"] is not None else -1, inzet.index(q))):
+        keten = next((k for k in koppels if k[-1]["tot"] is not None and p["van"] is not None and k[-1]["tot"] <= p["van"]), None)
+        if keten:
+            keten.append(p)
+        else:
+            koppels.append([p])
     gebruikt = [p for k in koppels for p in k]
     reserve = [p for p in inzet if p not in heel and p not in gebruikt]
     per_lokaal = [[p] for p in heel] + koppels
@@ -978,9 +1024,20 @@ def maak_rooster(bladen: dict, modus: str) -> dict:
             bezet.setdefault(k, []).append((a, b))
         return {"st": st, "slot": slot, "eind": b, "beo": beo, "simu": simu}
 
+    aantal: dict = {}  # studenten per lokaal (per dag) tot nu toe
+
+    def geordend(lijst):
+        # 'Evenredig': binnen hetzelfde tijdstip eerst het lokaal met de minste studenten; tijdvolgorde blijft gelijk.
+        if s["verdelen"] != "Evenredig":
+            return lijst
+        groep: dict = {}
+        for x in lijst:
+            groep.setdefault((x["d"], x["t"]), len(groep))
+        return sorted(lijst, key=lambda x: (groep[(x["d"], x["t"])], aantal.get((x["d"], norm(x["lokaal"])), 0), x["n"]))
+
     def probeer(st, strikt):
         duur = s["ttv"] if st["ttv"] else s["duur"]
-        for slot in (ttv_volgorde if st["ttv"] else per_voorkeur[st["voorkeur"]]):
+        for slot in geordend(ttv_volgorde if st["ttv"] else per_voorkeur[st["voorkeur"]]):
             a, b = slot["t"], slot["t"] + duur
             if not past(slot, a, b, st["ttv"]):
                 continue
@@ -988,6 +1045,7 @@ def maak_rooster(bladen: dict, modus: str) -> dict:
                 continue
             r = boek(slot, a, b, st, strikt)
             if r:
+                aantal[(slot["d"], norm(slot["lokaal"]))] = aantal.get((slot["d"], norm(slot["lokaal"])), 0) + 1
                 return r
         return None
 
@@ -1008,6 +1066,26 @@ def maak_rooster(bladen: dict, modus: str) -> dict:
             if r:
                 r["st"] = None
                 vrije.append(r)
+
+    # Lokaal waar niemand terechtkan: zeg welk lokaal en waarom (anders 'verdwijnt' bijv. een beoordelaar zonder uitleg).
+    gebruikt = {(r["slot"]["d"], norm(r["slot"]["lokaal"])) for r in list(toegewezen.values()) + vrije}
+    niemand = {"verboden": [], "eb": "", "ec": "", "ttv": False}
+    for d, lok in dict.fromkeys((x["d"], x["lokaal"]) for x in gewoon):
+        if (d, norm(lok)) in gebruikt:
+            continue
+        rs = [x for x in gewoon if x["d"] == d and x["lokaal"] == lok]
+        beo_namen = list(dict.fromkeys(p_["naam"] for x in rs for p_ in kandidaten(beoordelaars, x)))
+        bruik = [x for x in rs if past(x, x["t"], x["t"] + s["duur"], False)
+                 and kies(kandidaten(beoordelaars, x), x, x["t"], x["t"] + s["duur"], "b", niemand, False)
+                 and kies(kandidaten(simus, x), x, x["t"], x["t"] + s["duur"], "s", niemand, False)]
+        if bruik:
+            continue  # lokaal was bruikbaar maar niet nodig
+        reden = ("er is op geen enkel moment een beoordelaar" if not beo_namen else
+                 "er is op geen enkel moment een simucliënt die daar kan" if not any(kandidaten(simus, x) for x in rs) else
+                 "de beoordelaar of de simucliënten zijn steeds al in een ander lokaal bezig (bijv. minder simu's dan lokalen; "
+                 "zet meer simu's in of haal een lokaal weg)")
+        meldingen.append(("Waarschuwing", f"Lokaal {lok} op {datum_tekst(d)} ({' → '.join(beo_namen) or 'geen beoordelaar'}) "
+                          f"krijgt niemand: {reden}."))
 
     if s["rooster_sort"] == "Lokaal, dan tijd":
         rooster_sleutel = lambda r: (r["slot"]["d"], r["slot"]["lokaal"].lower(), r["slot"]["t"], r["slot"]["n"])  # noqa: E731

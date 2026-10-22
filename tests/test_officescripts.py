@@ -209,7 +209,34 @@ def toetsdag_keuken():
     return b
 
 
+def toetsdag_tijden_en_ruilen():
+    b = mv.dag_bladen()
+    T = mv.TOETS
+    kop = b["Toetsdag_Kans1"][0] + ["Beoordelaar 3"]
+    b["Toetsdag_Kans1"] = [kop,
+                           [T, "A", "Q 1", "", "COPM", "Ann tot 11.15", "Bram 11.45-13.00", "", "Cor vanaf 14.00"],
+                           [T, "B", "R 1", "", "COPM", "Dirk tot 13.00", "Eef vanaf 13.00", "", ""],
+                           [T, "C", "R 2", "", "COPM", "Eef tot 13.00", "Dirk vanaf 13.00", "", ""],
+                           [T, "D", "Q 2", "", "COPM", "Gijs", "Hans", "12.25", ""],
+                           [T, "E", "I 1", "", "COPM", "Ann van 14.00 tot 16.00", "", "", ""]]
+    return b
+
+
+def zeven_lokalen(verdelen):
+    def maak():
+        b = mv.concept_bladen()
+        b["Simu"] = b["Simu"][:6] + [b["Simu"][1], b["Simu"][2]]
+        for rij in b["Studenten"][1:]:
+            rij[5] = rij[6] = ""
+        b["Instellingen"] = rc.instellingen_matrix({"verdelen": verdelen})
+        return b
+    return maak
+
+
 SCENARIOS = {
+    "toetsdag_tijden_en_ruilen": toetsdag_tijden_en_ruilen,
+    "zeven_lokalen_evenredig": zeven_lokalen("Evenredig"),
+    "zeven_lokalen_op_volgorde": zeven_lokalen("Op volgorde"),
     "concept_keuken_en_kan_spelen": concept_keuken_en_kan_spelen,
     "toetsdag_keuken": toetsdag_keuken,
     "concept_vast_na_elke_toets": concept_vaste_simus("Na elke toets"),

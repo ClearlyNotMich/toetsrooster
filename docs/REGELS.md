@@ -14,7 +14,7 @@ Je vult drie dingen in. Het programma maakt de rest.
 2. **Toetsdag_Kans1** / **Toetsdag_Her**: één rij per lokaal per toetsdag, met deze kolommen:
    - *Datum*, *Lokaal*, *Casus*;
    - *Casus na pauze* (optioneel), *Vaardigheid*, *Beoordelaar*;
-   - *Beoordelaar 2* en *Wissel om* (optioneel), voor een wissel halverwege de dag. Bijvoorbeeld: Youri tot 12:25, daarna Nadine.
+   - *Beoordelaar 2* en *Wissel om* (optioneel), voor een wissel halverwege de dag. Bijvoorbeeld: Huub tot 12:25, daarna Gerdien.
 3. **Simu**: één rij per simucliënt per toetsdag: *Datum*, *simucliënt*, en optioneel *Vanaf*, *Tot*, *Vast lokaal* en *Kan spelen*. Een lege datum betekent elke dag. In de app vul je dit blad met **Simu's importeren…** vanuit het overzicht *Beschikbaarheid simu's*.
 
 Uit de instellingen (eerste toets, laatste toets, toetsduur, wisseltijd en pauzes) maakt het programma alle slots. Met de standaardwaarden is dat elke 20 minuten een student (15 min toets + 5 min wissel): 09:40–11:15, 11:45–13:00, 14:00–15:15 en 15:45–17:00. Dat zijn 17 slots per lokaal, net als op de echte toetsdag van 14 april.
@@ -26,7 +26,7 @@ Uit de instellingen (eerste toets, laatste toets, toetsduur, wisseltijd en pauze
 | A | B |
 |---|---|
 | datum | 15-12-2026 |
-| inzet | Ann de Boer |
+| inzet | Ann de Bruin |
 | | … (één naam per rij) |
 | | Fien ochtend tot 13.00 |
 | | Hans middag vanaf 13.30 uur |
@@ -53,6 +53,29 @@ Zo wordt het gelezen:
 Staat er een conceptblad in de werkmap, dan gaat het voor het blad Toetsdag. Dat staat dan ook als melding bij Meldingen. In de app zet **Concept laden…** het concept uit een ander bestand in de open werkmap. Bij *Excel opslaan* wordt het bewaard als blad *Concept*.
 
 **Oude werkwijze:** is het blad Toetsdag leeg en bestaat *Slots_Kans1* / *Slots_Her* (één rij per begintijd), dan worden de oude bladen gebruikt, samen met *Beoordelaars*. Een *Simu*-blad met een kolom *Tijd* wordt ook nog gelezen als één rij per slot.
+
+## Beoordelaars die niet de hele dag kunnen, of ruilen
+
+In het blad Toetsdag staat per lokaal *Beoordelaar*. Voeg zo nodig de kolommen *Beoordelaar 2*, *Beoordelaar 3*, enzovoort toe. Per toets neemt het lokaal de eerste beoordelaar die dan kan. Een tijd zet je in de cel:
+
+| Voorbeeld in de cel | Betekenis |
+|---|---|
+| `Fien tot 13.00` (of `Fien ochtend`) | tot 13:00 (*ochtend* = tot *Middag begint om*) |
+| `Hans vanaf 13.30` (of `Hans middag`) | vanaf 13:30 |
+| `Dorus 10.00-12.00` of `Dorus van 10.00 tot 12.00` | alleen in dat tijdvak |
+
+- Een toets moet binnen dat tijdvak passen.
+- **Wissel om** blijft ook werken: beoordelaar 1 tot die tijd, beoordelaar 2 vanaf die tijd.
+- **Ruilen:** lokaal A heeft `Ann tot 13.00` en `Bram vanaf 13.00`, lokaal B heeft `Bram tot 13.00` en `Ann vanaf 13.00`.
+- Staat iemand op dezelfde tijd in twee lokalen, dan volgt een waarschuwing.
+- In het **conceptblad** werkt dezelfde notatie bij *inzet*. Wie maar een deel van de dag kan, komt op tijdvolgorde samen in één lokaal (bijv. `Eef 10.00-12.00` → `Dorus van 12.00 tot 15.20` → `Lot vanaf 15.20`).
+
+**Lokalen vullen** (instelling):
+
+- **Evenredig** (standaard): op elk tijdstip gaat het lokaal met de minste studenten voor. Zo doet elk lokaal en elke beoordelaar mee, ook als er minder simu's dan lokalen zijn.
+- **Op volgorde:** eerst de bovenste lokalen.
+
+Een lokaal dat de hele dag niemand kan krijgen, staat met naam, beoordelaars en reden bij Meldingen.
 
 ## Kenmerken: casus die een bepaald lokaal nodig heeft
 
@@ -115,6 +138,7 @@ Alle instellingen staan in het blad **Instellingen** en in de app op de pagina *
 | Toetsdag | Eerste toets om | 09:40 | Begintijd van de eerste student. |
 | Toetsdag | Laatste toets klaar om | 17:00 | Geen toets loopt later door dan deze tijd. |
 | Toetsdag | Wisseltijd (min) | 5 | Tijd tussen twee studenten. |
+| Toetsdag | Lokalen vullen | Evenredig | Evenredig: op elk tijdstip eerst het lokaal met de minste studenten, zodat elk lokaal (en elke beoordelaar) ongeveer evenveel krijgt, ook als er minder simu's dan lokalen zijn. Op volgorde: eerst de bovenste lokalen. Keuzes: Evenredig / Op volgorde. |
 | Toetsduur | Jaar | 1 | Studiejaar van deze toets; bepaalt welke duur hieronder geldt. |
 | Toetsduur | Toetsduur jaar 1 (min) | 15 | Gewone toets in jaar 1. |
 | Toetsduur | TTV-toetsduur jaar 1 (min) | 20 | Toets met tijdverlenging in jaar 1. |
@@ -168,7 +192,7 @@ Alle instellingen staan in het blad **Instellingen** en in de app op de pagina *
    - bij minder simu's dan lokalen;
    - bij een dubbele naam;
    - bij een dag zonder simu's.
-4. **Uitsluitingen.** Beoordelaars in *Niet inroosteren bij …* worden voor die student overgeslagen. Namen scheid je met `,` `;` of `/` (bijvoorbeeld `Sofie/Youri`). Met *Namen deels vergelijken* telt een deel van de naam ook.
+4. **Uitsluitingen.** Beoordelaars in *Niet inroosteren bij …* worden voor die student overgeslagen. Namen scheid je met `,` `;` of `/` (bijvoorbeeld `Floor/Huub`). Met *Namen deels vergelijken* telt een deel van de naam ook.
 5. **Volgorde:**
    - eerst TTV-studenten;
    - dan studenten met een voorkeur;

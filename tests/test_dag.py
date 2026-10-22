@@ -46,7 +46,7 @@ def test_tijdgrid_zoals_echte_toetsdag():
 def test_kolommen_op_begin_van_kopnaam_en_slash():
     kop = ["Studentnummer", "Roepnaam", "Klas p2", "Niet inroosteren bij SB-docent P2"]
     assert (rc.kolom(kop, "voornaam", "roepnaam"), rc.kolom(kop, "klas"), rc.kolom(kop, "nietinroosterenbijsbdocent")) == (1, 2, 3)
-    assert rc.namen_lijst("Sofie/Youri; Ann ,Bram") == ["Sofie", "Youri", "Ann", "Bram"]
+    assert rc.namen_lijst("Floor/Huub; Ann ,Bram") == ["Floor", "Huub", "Ann", "Bram"]
 
 
 def test_voorkeur_en_opmerkingen():
@@ -403,3 +403,108 @@ def test_casus_zonder_passende_simu():
     tekst = " ".join(m[1] for m in r["meldingen"])
     assert "Casus K3 vrouw op 15-12-2026: geen simucliënt die deze casus kan spelen" in tekst
     assert not [x for x in rijen(r) if "vrouw" in x["Casus"] and x["bijzheden"] != rc.VRIJ]
+
+
+# ---------------------------------------------------------------- beoordelaars met tijden, ruilen, lokaal zonder iemand
+
+def test_lees_inzet_tijden():
+    for t, verwacht in [("Fien tot 13.00", ("Fien", None, 780)), ("Hans vanaf 13.30", ("Hans", 810, None)),
+                        ("Dorus 10.00-12.00", ("Dorus", 600, 720)), ("Dorus van 10.00 tot 12.00", ("Dorus", 600, 720)),
+                        ("Ida van Berkel", ("Ida van Berkel", None, None)), ("Bodil ochtend", ("Bodil", None, 720))]:
+        x = rc.lees_inzet(t, 720)
+        assert (x["naam"], x["van"], x["tot"]) == verwacht, t
+
+
+def dag_met(*rijen_):
+    def wijzig(b):
+        kop = b["Toetsdag_Kans1"][0] + ["Beoordelaar 3"]
+        b["Toetsdag_Kans1"] = [kop] + [list(r) + [""] * (len(kop) - len(r)) for r in rijen_]
+    return wijzig
+
+
+def test_beoordelaars_met_tijden_en_derde_beoordelaar():
+    T = mv.TOETS
+    r = plan(wijzig=dag_met(
+        [T, "A", "Q 1", "", "COPM", "Ann tot 11.15", "Bram 11.45-13.00", "", "Cor vanaf 14.00"],
+        [T, "B", "R 1", "", "COPM", "Dirk", "", "", ""],
+        [T, "C", "R 2", "", "COPM", "Eef", "Fien", "13.00", ""],
+    ))
+    assert r["fouten"] == []
+    a = {tijd(x["Tijd"]): x["Beoordelaar"] for x in rijen(r) if x["Lokaal"] == "A"}
+    assert a["09:40"] == a["11:00"] == "Ann" and a["11:45"] == a["12:45"] == "Bram" and a["14:00"] == a["16:45"] == "Cor"
+    c = {tijd(x["Tijd"]): x["Beoordelaar"] for x in rijen(r) if x["Lokaal"] == "C"}
+    assert c["12:45"] == "Eef" and c["14:00"] == "Fien"
+
+
+def test_beoordelaars_ruilen_van_lokaal():
+    T = mv.TOETS
+    r = plan(wijzig=dag_met(
+        [T, "A", "Q 1", "", "COPM", "Ann tot 13.00", "Bram vanaf 13.00", "", ""],
+        [T, "B", "R 1", "", "COPM", "Bram tot 13.00", "Ann vanaf 13.00", "", ""],
+    ))
+    assert r["fouten"] == [] and not any("twee lokalen" in m[1] for m in r["meldingen"])
+    a = {x["Beoordelaar"] for x in rijen(r) if x["Lokaal"] == "A" and x["Tijd"] * 1440 >= 780}
+    assert a == {"Bram"} and {x["Casus"] for x in rijen(r) if x["Beoordelaar"] == "Ann"} == {"Q 1", "R 1"}
+
+
+def test_beoordelaar_dubbel_ingezet_en_fouten():
+    T = mv.TOETS
+    r = plan(wijzig=dag_met(
+        [T, "A", "Q 1", "", "COPM", "Ann", "", "", ""],
+        [T, "B", "R 1", "", "COPM", "Bram tot 12.00", "Ann vanaf 11.00", "", ""],
+    ))
+    assert any("Ann staat op 14-04-2026 van 11:00 tot 17:00 in twee lokalen (A en B)" in m[1] for m in r["meldingen"])
+    r = plan(wijzig=dag_met([T, "A", "Q 1", "", "COPM", "Ann", "Bram", "", ""]))
+    assert any("vul 'Wissel om' in, of zet tijden in de cel" in f for f in r["fouten"])
+    r = plan(wijzig=dag_met([T, "A", "Q 1", "", "COPM", "Ann", "", "13.00", ""]))
+    assert any("vraagt ook een 'Beoordelaar 2'" in f for f in r["fouten"])
+
+
+def zeven_lokalen_vijf_simus(verdelen):
+    """Zoals in het demobestand: 7 lokalen, 5 verschillende simu's (2 staan dubbel), geen uitsluitingen."""
+    def wijzig(b):
+        b["Simu"] = b["Simu"][:6] + [b["Simu"][1], b["Simu"][2]]
+        for rij in b["Studenten"][1:]:
+            rij[5] = rij[6] = ""
+        b["Instellingen"] = rc.instellingen_matrix({"verdelen": verdelen})
+    return wijzig
+
+
+def test_lokalen_evenredig_vullen_bij_te_weinig_simus():
+    from collections import Counter
+    r = concept(zeven_lokalen_vijf_simus("Evenredig"))
+    per = Counter(x["Lokaal"] for x in rijen(r) if x["bijzheden"] != rc.VRIJ)
+    assert len(per) == 7 and sum(per.values()) == 61 and max(per.values()) - min(per.values()) <= 3
+    assert {"Fien", "Hans"} <= {x["Beoordelaar"] for x in rijen(r)}  # ook de beoordelaars van het laatste lokaal
+    assert not any("krijgt niemand" in m[1] for m in r["meldingen"])
+
+
+def test_op_volgorde_vullen_en_lokaal_zonder_iemand_krijgt_eigen_waarschuwing():
+    r = concept(zeven_lokalen_vijf_simus("Op volgorde"))
+    niemand = [m[1] for m in r["meldingen"] if "krijgt niemand" in m[1]]
+    assert niemand and all("minder simu's dan lokalen" in m for m in niemand)
+    assert any("C2 op 15-12-2026 (Fien → Hans)" in m for m in niemand)  # wie 'verdwijnt' staat er nu bij
+
+    def niemand_speelt_i1(b):
+        b["Simu"][0].append("Kan spelen")
+        for rij in b["Simu"][1:]:
+            rij.append("Q 1, R 1, R 2, Q 2")
+    r = plan(wijzig=niemand_speelt_i1)
+    assert any("Lokaal C1.39 op 14-04-2026 (Eef → Fien) krijgt niemand: er is op geen enkel moment een simucliënt" in m[1]
+               for m in r["meldingen"])
+    r = plan()  # genoeg simu's: geen waarschuwing
+    assert not any("krijgt niemand" in m[1] for m in r["meldingen"])
+
+
+def test_concept_beoordelaars_met_tijdvakken_in_keten():
+    def tijdvakken(b):
+        blad = b["Concept"]
+        i = [k for k, r in enumerate(blad) if r[0] == "inzet"][0]
+        blad[i + 4][1] = "Eef 10.00-12.00"           # Eef alleen 's ochtends
+        blad.insert(i + 5, ["", "Dorus van 12.00 tot 15.20"])  # sluit aan op Eef
+        blad.insert(i + 6, ["", "Lot vanaf 15.20"])          # sluit aan op Dorus
+    r = concept(tijdvakken)
+    tekst = " ".join(m[1] for m in r["meldingen"])
+    assert "C2 Eef (10:00-12:00) → Dorus (12:00-15:20) → Lot (vanaf 15:20)" in tekst
+    per = {x["Beoordelaar"] for x in rijen(r) if x["Beoordelaar"] in ("Eef", "Dorus", "Lot")}
+    assert per == {"Eef", "Dorus", "Lot"} and len({x["Lokaal"] for x in rijen(r) if x["Beoordelaar"] in per}) == 1

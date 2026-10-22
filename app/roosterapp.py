@@ -34,8 +34,9 @@ HULP = """
       beoordelen (scheiden met , ; of /). Tekst in <i>Opmerkingen</i> zoals ‘ttv bij uitvoering’ of ‘graag in de ochtend’
       wordt herkend en staat bij Meldingen om te controleren.</li>
   <li><b>Toetsdag_Kans1 / Toetsdag_Her</b> — één rij per lokaal per toetsdag: datum, lokaal, casus (en eventueel
-      <i>Casus na pauze</i>), vaardigheid en beoordelaar. Wisselt de beoordelaar halverwege, vul dan <i>Beoordelaar 2</i>
-      en <i>Wissel om</i> in.</li>
+      <i>Casus na pauze</i>), vaardigheid en beoordelaar. Kan iemand niet de hele dag? Zet de tijd in de cel
+      (‘Fien tot 13.00’, ‘Hans vanaf 13.30’, ‘Dorus 10.00-12.00’) en vul <i>Beoordelaar 2</i>, <i>3</i>, … in.
+      Ruilen kan ook: lokaal A ‘Ann tot 13.00’ + ‘Bram vanaf 13.00’, lokaal B andersom.</li>
   <li><b>Of in lijstvorm</b> — één blad met in kolom A de kopjes <i>datum, inzet, tijden, pauzes, lokalen, casussen, simu's</i>
       en in kolom B de waarden eronder, zoals je het opschrijft. Uit een ander bestand: <i>Concept laden…</i> in de zijbalk.
       ‘ochtend tot 13.00’ en ‘middag vanaf 13.30’ delen een lokaal; een naam met (opmerking) is reserve.</li>
