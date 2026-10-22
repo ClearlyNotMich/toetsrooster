@@ -675,6 +675,18 @@ function leesToetsdag(matrix: Matrix, blad: string, tijden: number[], s: Map<str
     const kw: number = kolom(kop, ["wisselom"]);
     const kbs: number[] = [kb].concat(kop.map((k: Cel, i: number) => /^beoordelaar\d+$/.test(norm(k)) ? i : -1)
         .filter((i: number) => i >= 0));
+    const precies = (namen: string[]): number => {
+        for (let i: number = 0; i < kop.length; i++) {
+            if (namen.indexOf(norm(kop[i])) >= 0) {
+                return i;
+            }
+        }
+        return -1;
+    };
+    const tijdkol: number[][] = kbs.map((k: number, j: number) => {
+        const n: string = j === 0 ? "" : norm(kop[k]).slice("beoordelaar".length);
+        return [precies([`van${n}`, `vanaf${n}`]), precies([`tot${n}`])];
+    });
     if (Math.min(kd, kl, kb) < 0) {
         fouten.push(`Blad '${blad}': kolommen 'Datum', 'Lokaal' en 'Beoordelaar' zijn verplicht.`);
         return;
@@ -688,8 +700,35 @@ function leesToetsdag(matrix: Matrix, blad: string, tijden: number[], s: Map<str
         }
         const d: number | null = naarDatum(cel(rij, kd));
         const lokaal: Kenmerk = kenmerken(cel(rij, kl));
-        const wie: Inzet[] = kbs.filter((k: number) => tekst(cel(rij, k)) !== "")
-            .map((k: number) => leesInzet(tekst(cel(rij, k)), s.get("middag") as number));
+        const wie: Inzet[] = [];
+        let fout: string = "";
+        kbs.forEach((k: number, j: number) => {
+            if (!tekst(cel(rij, k))) {
+                return;
+            }
+            const p: Inzet = leesInzet(tekst(cel(rij, k)), s.get("middag") as number);
+            for (const [kol, veld] of [[tijdkol[j][0], "van"], [tijdkol[j][1], "tot"]] as [number, string][]) {
+                if (tekst(cel(rij, kol))) { // kolommen Van/Tot gaan voor tijden in de cel
+                    const t: number | null = naarMinuten(cel(rij, kol));
+                    if (veld === "van") {
+                        p.van = t;
+                    } else {
+                        p.tot = t;
+                    }
+                    if (t === null) {
+                        fout = `'${tekst(kop[kol])}' moet een tijd zijn (bijv. 13:00), niet '${tekst(cel(rij, kol))}'.`;
+                    }
+                }
+            }
+            if (p.van !== null && p.tot !== null && p.van >= p.tot) {
+                fout = `bij ${p.naam} ligt 'van' (${tijdTekst(p.van)}) niet vóór 'tot' (${tijdTekst(p.tot)}).`;
+            }
+            wie.push(p);
+        });
+        if (fout) {
+            fouten.push(`Blad '${blad}' rij ${i + 1}: ${fout}`);
+            continue;
+        }
         const w: number | null = tekst(cel(rij, kw)) ? naarMinuten(cel(rij, kw)) : null;
         if (d === null || !lokaal.naam || wie.length === 0) {
             fouten.push(`Blad '${blad}' rij ${i + 1}: vul een geldige datum (${DATUM_VOORBEELD}; nu ` +
@@ -704,8 +743,8 @@ function leesToetsdag(matrix: Matrix, blad: string, tijden: number[], s: Map<str
             wie[0].tot = wie[0].tot !== null ? wie[0].tot : w;
             wie[1].van = wie[1].van !== null ? wie[1].van : w;
         } else if (wie.length > 1 && wie.every((p: Inzet) => p.van === null && p.tot === null)) {
-            fouten.push(`Blad '${blad}' rij ${i + 1}: bij meer beoordelaars in één lokaal: vul 'Wissel om' in, of zet ` +
-                "tijden in de cel (bijv. 'Fien tot 13.00' en 'Hans vanaf 13.30').");
+            fouten.push(`Blad '${blad}' rij ${i + 1}: bij meer beoordelaars in één lokaal: vul 'Van'/'Tot' per beoordelaar ` +
+                "in (of 'Wissel om').");
             continue;
         }
         if (gezien.indexOf(`${d}_${norm(lokaal.naam)}`) >= 0) {

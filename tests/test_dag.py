@@ -455,7 +455,7 @@ def test_beoordelaar_dubbel_ingezet_en_fouten():
     ))
     assert any("Ann staat op 14-04-2026 van 11:00 tot 17:00 in twee lokalen (A en B)" in m[1] for m in r["meldingen"])
     r = plan(wijzig=dag_met([T, "A", "Q 1", "", "COPM", "Ann", "Bram", "", ""]))
-    assert any("vul 'Wissel om' in, of zet tijden in de cel" in f for f in r["fouten"])
+    assert any("vul 'Van'/'Tot' per beoordelaar in (of 'Wissel om')" in f for f in r["fouten"])
     r = plan(wijzig=dag_met([T, "A", "Q 1", "", "COPM", "Ann", "", "13.00", ""]))
     assert any("vraagt ook een 'Beoordelaar 2'" in f for f in r["fouten"])
 
@@ -508,3 +508,41 @@ def test_concept_beoordelaars_met_tijdvakken_in_keten():
     assert "C2 Eef (10:00-12:00) → Dorus (12:00-15:20) → Lot (vanaf 15:20)" in tekst
     per = {x["Beoordelaar"] for x in rijen(r) if x["Beoordelaar"] in ("Eef", "Dorus", "Lot")}
     assert per == {"Eef", "Dorus", "Lot"} and len({x["Lokaal"] for x in rijen(r) if x["Beoordelaar"] in per}) == 1
+
+
+def dag_kolommen(*rijen_):
+    """Blad Toetsdag met per beoordelaar eigen kolommen Van/Tot."""
+    def wijzig(b):
+        kop = ["Datum", "Lokaal", "Casus", "Vaardigheid", "Beoordelaar", "Van", "Tot", "Beoordelaar 2", "Van 2", "Tot 2",
+               "Beoordelaar 3", "Van 3", "Tot 3"]
+        b["Toetsdag_Kans1"] = [kop] + [list(r) + [""] * (len(kop) - len(r)) for r in rijen_]
+    return wijzig
+
+
+def test_beoordelaars_met_kolommen_van_tot():
+    T = mv.TOETS
+    r = plan(wijzig=dag_kolommen(
+        [T, "A", "Q 1", "COPM", "Fien", "", "13:00", "Hans", 13.5 / 24, ""],          # tijd als Excel-tijd of tekst
+        [T, "B", "R 1", "COPM", "Ann", "", "", "", "", "", "", "", ""],
+        [T, "C", "R 2", "COPM", "Bram", "", "13.00", "Cor", "13.00", "15:15", "Dirk", "15:40", ""],
+        [T, "D", "Q 2", "COPM", "Eef tot 11.00", "", "", "", "", ""],                   # oude notatie in de cel werkt nog
+        [T, "E", "I 1", "COPM", "Gijs tot 11.00", "", "16:00", "", "", ""],             # kolom gaat voor de cel
+    ))
+    assert r["fouten"] == []
+    per = lambda lok: {tijd(x["Tijd"]): x["Beoordelaar"] for x in rijen(r) if x["Lokaal"] == lok}  # noqa: E731
+    a = per("A")
+    assert a["12:45"] == "Fien" and a["14:00"] == "Hans" and "13:00" not in a
+    c = per("C")
+    assert c["12:45"] == "Bram" and c["14:00"] == c["15:00"] == "Cor" and c["15:45"] == "Dirk"
+    assert set(per("D").values()) == {"Eef"} and max(per("D")) == "10:40"
+    assert "16:45" not in per("E") and per("E")["14:00"] == "Gijs"
+
+
+def test_kolommen_van_tot_fouten():
+    T = mv.TOETS
+    r = plan(wijzig=dag_kolommen([T, "A", "Q 1", "COPM", "Fien", "", "13u"]))
+    assert any("'Tot' moet een tijd zijn (bijv. 13:00), niet '13u'" in f for f in r["fouten"])
+    r = plan(wijzig=dag_kolommen([T, "A", "Q 1", "COPM", "Fien", "14:00", "13:00"]))
+    assert any("bij Fien ligt 'van' (14:00) niet vóór 'tot' (13:00)" in f for f in r["fouten"])
+    r = plan(wijzig=dag_kolommen([T, "A", "Q 1", "COPM", "Fien", "", "", "Hans", "", ""]))
+    assert any("vul 'Van'/'Tot' per beoordelaar in" in f for f in r["fouten"])

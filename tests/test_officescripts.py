@@ -233,7 +233,25 @@ def zeven_lokalen(verdelen):
     return maak
 
 
+def toetsdag_kolommen(rijen_):
+    def maak():
+        b = mv.dag_bladen()
+        kop = ["Datum", "Lokaal", "Casus", "Vaardigheid", "Beoordelaar", "Van", "Tot", "Beoordelaar 2", "Van 2", "Tot 2",
+               "Beoordelaar 3", "Vanaf 3", "Tot 3"]
+        b["Toetsdag_Kans1"] = [kop] + [list(r) + [""] * (len(kop) - len(r)) for r in rijen_]
+        return b
+    return maak
+
+
 SCENARIOS = {
+    "toetsdag_kolommen_van_tot": toetsdag_kolommen([
+        [mv.TOETS, "A", "Q 1", "COPM", "Fien", "", "13:00", "Hans", 13.5 / 24, ""],
+        [mv.TOETS, "B", "R 1", "COPM", "Ann tot 12.00", "", "", "Bram", "12:00", "", "Ann", "15:40", ""],
+        [mv.TOETS, "C", "R 2", "COPM", "Bram", "", "12.00", "Cor", "13.00", "15:15", "Dirk", "15:40", ""],
+        [mv.TOETS, "D", "Q 2", "COPM", "Gijs tot 11.00", "", "16:00"]]),
+    "toetsdag_kolommen_fout": toetsdag_kolommen([
+        [mv.TOETS, "A", "Q 1", "COPM", "Fien", "", "13u"],
+        [mv.TOETS, "B", "R 1", "COPM", "Ann", "14:00", "13:00"]]),
     "toetsdag_tijden_en_ruilen": toetsdag_tijden_en_ruilen,
     "zeven_lokalen_evenredig": zeven_lokalen("Evenredig"),
     "zeven_lokalen_op_volgorde": zeven_lokalen("Op volgorde"),

@@ -98,8 +98,8 @@ def maak_sjabloon(pad: str) -> None:
     """Lege werkmap met de juiste bladen en kolommen, om zelf in te vullen."""
     from openpyxl import Workbook
     s = rc.STANDAARD
-    dag = ["Datum", "Lokaal", "Casus", "Casus na pauze", "Vaardigheid", "Beoordelaar", "Beoordelaar 2", "Wissel om",
-           "Beoordelaar 3"]
+    dag = ["Datum", "Lokaal", "Casus", "Casus na pauze", "Vaardigheid", "Beoordelaar", "Van", "Tot",
+           "Beoordelaar 2", "Van 2", "Tot 2", "Beoordelaar 3", "Van 3", "Tot 3"]
     wb = Workbook()
     wb.remove(wb.active)
     rc.schrijf_bladen(wb, {

@@ -56,19 +56,21 @@ Staat er een conceptblad in de werkmap, dan gaat het voor het blad Toetsdag. Dat
 
 ## Beoordelaars die niet de hele dag kunnen, of ruilen
 
-In het blad Toetsdag staat per lokaal *Beoordelaar*. Voeg zo nodig de kolommen *Beoordelaar 2*, *Beoordelaar 3*, enzovoort toe. Per toets neemt het lokaal de eerste beoordelaar die dan kan. Een tijd zet je in de cel:
+In het blad Toetsdag heeft elke beoordelaar eigen kolommen **Van** en **Tot**. Leeg betekent vanaf het begin of tot het eind van de dag. Voor meer beoordelaars in één lokaal voeg je *Beoordelaar 2* / *Van 2* / *Tot 2* toe, dan *Beoordelaar 3* / *Van 3* / *Tot 3*, enzovoort. Per toets neemt het lokaal de eerste beoordelaar die dan kan, en de toets moet binnen zijn of haar tijd passen.
 
-| Voorbeeld in de cel | Betekenis |
-|---|---|
-| `Fien tot 13.00` (of `Fien ochtend`) | tot 13:00 (*ochtend* = tot *Middag begint om*) |
-| `Hans vanaf 13.30` (of `Hans middag`) | vanaf 13:30 |
-| `Dorus 10.00-12.00` of `Dorus van 10.00 tot 12.00` | alleen in dat tijdvak |
+| Lokaal | Beoordelaar | Van | Tot | Beoordelaar 2 | Van 2 | Tot 2 |
+|---|---|---|---|---|---|---|
+| C1.39 | Fien | | 13:00 | Hans | 13:30 | |
+| A | Ann | | 13:00 | Bram | 13:00 | |
+| B | Bram | | 13:00 | Ann | 13:00 | |
+| C | Dorus | 10:00 | 12:00 | | | |
 
-- Een toets moet binnen dat tijdvak passen.
-- **Wissel om** blijft ook werken: beoordelaar 1 tot die tijd, beoordelaar 2 vanaf die tijd.
-- **Ruilen:** lokaal A heeft `Ann tot 13.00` en `Bram vanaf 13.00`, lokaal B heeft `Bram tot 13.00` en `Ann vanaf 13.00`.
-- Staat iemand op dezelfde tijd in twee lokalen, dan volgt een waarschuwing.
-- In het **conceptblad** werkt dezelfde notatie bij *inzet*. Wie maar een deel van de dag kan, komt op tijdvolgorde samen in één lokaal (bijv. `Eef 10.00-12.00` → `Dorus van 12.00 tot 15.20` → `Lot vanaf 15.20`).
+- In het voorbeeld ruilen **Ann en Bram** om 13:00 van lokaal. Staat iemand op dezelfde tijd in twee lokalen, dan volgt een waarschuwing.
+- Een ongeldige tijd, of een *Van* na *Tot*, geeft een fout met het rijnummer.
+- Dit werkt ook nog, maar de kolommen gaan voor:
+  - een tijd in de cel zelf (`Fien tot 13.00`, `Hans vanaf 13.30`, `Dorus 10.00-12.00`);
+  - **Wissel om**: beoordelaar 1 tot die tijd, beoordelaar 2 vanaf die tijd.
+- In het **conceptblad** (lijstvorm) zet je de tijd achter de naam bij *inzet*. Wie maar een deel van de dag kan, komt op tijdvolgorde samen in één lokaal (bijv. `Eef 10.00-12.00` → `Dorus van 12.00 tot 15.20` → `Lot vanaf 15.20`).
 
 **Lokalen vullen** (instelling):
 

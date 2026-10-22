@@ -501,14 +501,17 @@ def meld_koppeling(lokalen: list, casussen: list, eisen: list, uit: list, d, mel
 
 def lees_toetsdag(matrix: list, blad: str, s: dict, fouten: list, meldingen: list) -> tuple[list, dict]:
     """Blad Toetsdag (één rij per lokaal per dag) -> slots en beschikbare beoordelaars per slot.
-    Beoordelaar, Beoordelaar 2, 3, …: per slot de eerste die dan kan. Tijden in de cel ('Fien tot 13.00',
-    'Dorus 10.00-12.00') of met 'Wissel om' tussen beoordelaar 1 en 2.
+    Beoordelaar, Beoordelaar 2, 3, …: per slot de eerste die dan kan. Tijden in de kolommen Van/Tot (Van 2/Tot 2, …);
+    anders in de cel ('Fien tot 13.00', 'Dorus 10.00-12.00') of met 'Wissel om' tussen beoordelaar 1 en 2.
     Kenmerken tussen haakjes: 'C1.36 (keuken)' en casus 'K3 (keuken)' -> die casus (met beoordelaar) gaat naar dat lokaal."""
     kop = list(matrix[0])
     kd, kl, kb = kolom(kop, "datum"), kolom(kop, "lokaal"), kolom(kop, "beoordelaar")
     kc, kn, kv = kolom(kop, "casus"), kolom(kop, "casusnapauze"), kolom(kop, "vaardigheid")
     kw = kolom(kop, "wisselom")
     kbs = [kb] + [i for i, k in enumerate(kop) if re.fullmatch(r"beoordelaar\d+", norm(k))]
+    precies = lambda *namen: next((i for i, k in enumerate(kop) if norm(k) in namen), -1)  # noqa: E731
+    tijdkol = [(precies(f"van{n}", f"vanaf{n}"), precies(f"tot{n}"))
+               for n in [""] + [norm(kop[k])[len("beoordelaar"):] for k in kbs[1:]]]
     if min(kd, kl, kb) < 0:
         fouten.append(f"Blad '{blad}': kolommen 'Datum', 'Lokaal' en 'Beoordelaar' zijn verplicht.")
         return [], {}
@@ -517,7 +520,22 @@ def lees_toetsdag(matrix: list, blad: str, s: dict, fouten: list, meldingen: lis
         if leeg(rij):
             continue
         d, lokaal = naar_datum(cel(rij, kd)), kenmerken(cel(rij, kl))
-        wie = [lees_inzet(tekst(cel(rij, k)), s["middag"]) for k in kbs if tekst(cel(rij, k))]
+        wie, fout = [], ""
+        for k, (kv_, kt_) in zip(kbs, tijdkol):
+            if not tekst(cel(rij, k)):
+                continue
+            p_ = lees_inzet(tekst(cel(rij, k)), s["middag"])
+            for kol, veld in ((kv_, "van"), (kt_, "tot")):  # kolommen Van/Tot gaan voor tijden in de cel
+                if tekst(cel(rij, kol)):
+                    p_[veld] = naar_minuten(cel(rij, kol))
+                    if p_[veld] is None:
+                        fout = f"'{tekst(kop[kol])}' moet een tijd zijn (bijv. 13:00), niet '{tekst(cel(rij, kol))}'."
+            if p_["van"] is not None and p_["tot"] is not None and p_["van"] >= p_["tot"]:
+                fout = f"bij {p_['naam']} ligt 'van' ({tijd_tekst(p_['van'])}) niet vóór 'tot' ({tijd_tekst(p_['tot'])})."
+            wie.append(p_)
+        if fout:
+            fouten.append(f"Blad '{blad}' rij {i + 1}: {fout}")
+            continue
         w = naar_minuten(cel(rij, kw)) if tekst(cel(rij, kw)) else None
         if d is None or not lokaal[0] or not wie:
             fouten.append(f"Blad '{blad}' rij {i + 1}: vul een geldige datum ({DATUM_VOORBEELD}; nu "
@@ -530,8 +548,8 @@ def lees_toetsdag(matrix: list, blad: str, s: dict, fouten: list, meldingen: lis
             wie[0]["tot"] = wie[0]["tot"] if wie[0]["tot"] is not None else w
             wie[1]["van"] = wie[1]["van"] if wie[1]["van"] is not None else w
         elif len(wie) > 1 and all(p["van"] is None and p["tot"] is None for p in wie):
-            fouten.append(f"Blad '{blad}' rij {i + 1}: bij meer beoordelaars in één lokaal: vul 'Wissel om' in, of zet "
-                          "tijden in de cel (bijv. 'Fien tot 13.00' en 'Hans vanaf 13.30').")
+            fouten.append(f"Blad '{blad}' rij {i + 1}: bij meer beoordelaars in één lokaal: vul 'Van'/'Tot' per beoordelaar "
+                          "in (of 'Wissel om').")
             continue
         if f"{d}_{norm(lokaal[0])}" in gezien:
             fouten.append(f"Blad '{blad}' rij {i + 1}: lokaal {lokaal[0]} staat al eerder op {datum_tekst(d)}.")

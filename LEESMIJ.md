@@ -32,7 +32,7 @@ De knoppen op het blad *Studenten* verwijzen naar de scripts in je OneDrive. Ver
 | Blad | Eén rij per | Kolommen |
 |---|---|---|
 | **Studenten** | student | Studentnummer, Voornaam/Roepnaam, Tussenvoegsel, Achternaam, Klas, Niet inroosteren bij SB-docent, Niet inroosteren bij de vaardighedendocent, en optioneel TTV, Voorkeur, Opmerkingen en IsHerkanser |
-| **Toetsdag_Kans1** / **Toetsdag_Her** | lokaal per toetsdag | Datum, Lokaal, Casus, Casus na pauze, Vaardigheid, Beoordelaar, Beoordelaar 2 (3, …), Wissel om. Tijden mogen in de cel staan: `Fien tot 13.00`, `Hans vanaf 13.30`, `Dorus 10.00-12.00` |
+| **Toetsdag_Kans1** / **Toetsdag_Her** | lokaal per toetsdag | Datum, Lokaal, Casus, Casus na pauze, Vaardigheid, Beoordelaar, **Van**, **Tot**, en eventueel Beoordelaar 2 / Van 2 / Tot 2, Beoordelaar 3 / … voor wie elkaar aflossen of ruilen. Lege Van/Tot = de hele dag. |
 | **Simu** | simucliënt per toetsdag | Datum, simucliënt, Vanaf, Tot, en optioneel Vast lokaal (leeg = wisselt mee, Ja = blijft in één lokaal, of een lokaalnaam) en Kan spelen (bijv. `vrouw` of `P1, P2`; leeg = alles) |
 
 Heeft een casus een speciaal lokaal nodig, bijvoorbeeld een keuken? Zet dan kenmerken tussen haakjes: lokaal `C1.36 (keuken)` en casus `K3 vrouw (keuken)`. De casus gaat dan, met zijn beoordelaar, vanzelf naar een passend lokaal.
