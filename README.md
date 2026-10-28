@@ -98,4 +98,4 @@ Let op: de toetsduur voor jaar 2 staat standaard gelijk aan die van jaar 1. Pas 
   ```
 
 - Bouwen doe je met `pyinstaller roosterapp.spec`. Bij elke push naar `main` bouwt GitHub zelf de versies voor Windows en Linux.
-- Zet nooit echte werkmappen met studentgegevens in deze repository. De voorbeeldwerkmap bevat verzonnen gegevens en maak je met `python tools/maak_voorbeeld.py`.
+- Zet nooit echte werkmappen met studentgegevens in deze repository. De voorbeeldwerkmap bevat verzonnen gegevens.
