@@ -35,8 +35,6 @@ Vast lokaal bepaalt of een simu van lokaal wisselt. Leeg betekent dat de simu me
 
 Dit blad maakt het programma zelf aan. Hier staan onder meer de begin- en eindtijd, de pauzes en de toetsduur (standaard 15 minuten, 20 met TTV). Je stelt hier ook in of simu's na elke pauze, na elke toets of nooit van lokaal wisselen, en of de lokalen evenredig gevuld worden zodat iedere beoordelaar studenten krijgt. Dat laatste staat standaard aan.
 
-Werk je liever met een lijstje, zoals je het op papier zou opschrijven, dan kan dat ook. Voeg een blad toe met in kolom A de kopjes datum, inzet, tijden, pauzes, lokalen, casussen en simu's, en in kolom B de waarden. Staat zo'n lijst in de werkmap, dan gebruikt het programma die in plaats van het blad Toetsdag, en gaan de tijden en pauzes uit de lijst voor de instellingen. Hoe dat precies werkt staat in [docs/REGELS.md](docs/REGELS.md).
-
 ## Wat eruit komt
 
 - Rooster_Kans1 en Rooster_Her: het complete rooster per lokaal en tijd. Lege plekken staan erin als Vrije plek.
