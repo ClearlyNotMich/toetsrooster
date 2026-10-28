@@ -7,8 +7,6 @@ Je kunt het op twee manieren gebruiken, met bij allebei dezelfde uitkomst:
 - in Excel Online, via de knoppen op het eerste blad van de werkmap;
 - met het programma Toetsrooster op je eigen computer. Dat is één los bestand dat je zonder installatie start.
 
-Alle regels die het programma volgt staan in [docs/REGELS.md](docs/REGELS.md).
-
 ## De werkmap invullen
 
 ### Studenten
