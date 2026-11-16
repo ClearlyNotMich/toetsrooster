@@ -42,7 +42,8 @@ HULP = """
   <li>Liever een lijst, zoals op papier? Zet die als extra blad in de werkmap. Zie de README.</li>
   </ul></li>
 <li>Open de werkmap. Download hem eerst uit OneDrive of SharePoint.</li>
-<li>Kijk de instellingen na: tijden, toetsduur, pauzes en wanneer simu's van lokaal wisselen. Het programma onthoudt
+<li>Kijk de instellingen na: tijden, toetsduur, pauzes, wanneer en hoe vaak simu's van lokaal wisselen, en of het
+  rooster per lokaal, per klas of op tijd staat. Het programma onthoudt
   ze, ook na afsluiten. Heeft een werkmap andere instellingen, dan kun je die overnemen op de pagina Instellingen.</li>
 <li>Kies Eerste kans of Herkansing en klik op Rooster maken. Kijk daarna bij Meldingen.</li>
 <li>Sla op als Excel, of maak een pdf voor docenten of voor studenten. Je originele bestand blijft ongewijzigd.</li>
@@ -346,7 +347,7 @@ class Venster(QMainWindow):
         for r, rij in enumerate(data):
             soort = rc.tekst(rij[0]) if kop == rc.MELDINGEN_KOP else ""
             niet = rc.NIET in rij
-            vrij = rc.VRIJ in rij
+            vrij = rc.VRIJ in rij or rc.PAUZE in rij
             for c, waarde in enumerate(rij):
                 item = QTableWidgetItem(toon(kop[c], waarde))
                 if vrij:
@@ -440,7 +441,7 @@ class Venster(QMainWindow):
             self.vul(self.tabel_uitdraai, r["bladen"][r["namen"]["uitdraai"]])
             niet = sum(1 for rij in rooster if rc.NIET in rij)
             vrij = sum(1 for rij in rooster if rc.VRIJ in rij)
-            totaal = len(rooster) - 1 - vrij
+            totaal = len(rooster) - 1 - vrij - sum(1 for rij in rooster if rc.PAUZE in rij)
             self.stat_in.zet(f"{totaal - niet} / {totaal}", rc.MODI[r["modus"]]["naam"].lower()
                              + (f" · {vrij} vrije plekken" if vrij else ""))
             self.stat_waarsch.zet(str(waarsch), "zie Meldingen" if waarsch else "alles in orde",

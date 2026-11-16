@@ -45,9 +45,11 @@ def html_rooster(titel: str, matrix: list) -> str:
     i = {k: kop.index(k) for k in kop}
     groepen: dict = {}
     niet = []
+    tijd = lambda a, e: f"{rc.tijd_tekst(rc.naar_minuten(a))}–{rc.tijd_tekst(rc.naar_minuten(e))}"  # noqa: E731
+    pauzes = {(r[i["Datum"]], r[i["Tijd"]], r[i["Eindtijd"]]) for r in matrix[1:] if r[i["bijzheden"]] == rc.PAUZE}
     for rij in matrix[1:]:
-        if rij[i["bijzheden"]] == rc.VRIJ:
-            continue  # vrije plekken alleen in het Excel-rooster
+        if rij[i["bijzheden"]] in (rc.VRIJ, rc.PAUZE):
+            continue  # vrije plekken alleen in het Excel-rooster; pauzes komen hieronder per lokaal terug
         if rij[i["bijzheden"]] == rc.NIET:
             niet.append(rij)
         else:
@@ -56,10 +58,13 @@ def html_rooster(titel: str, matrix: list) -> str:
     for n, ((datum, lokaal), rijen) in enumerate(sorted(groepen.items(), key=lambda g: (g[0][0], rc.tekst(g[0][1]).lower()))):
         rijen.sort(key=lambda r: r[i["Tijd"]])
         casussen = sorted({rc.tekst(r[i["Casus"]]) for r in rijen if rc.tekst(r[i["Casus"]])})
-        regels = [[f"{rc.tijd_tekst(rc.naar_minuten(r[i['Tijd']]))}–{rc.tijd_tekst(rc.naar_minuten(r[i['Eindtijd']]))}",
+        regels = [[tijd(r[i["Tijd"]], r[i["Eindtijd"]]),
                    " ".join(rc.tekst(r[i[k]]) for k in ("Voornaam", "vv", "Achternaam") if rc.tekst(r[i[k]])),
                    r[i["stnr"]], r[i["klas"]], r[i["Casus"]], r[i["Beoordelaar"]], r[i["simucliënt"]], r[i["bijzheden"]]]
                   for r in rijen]
+        regels += [[tijd(a, e), rc.PAUZE] + [""] * 6 for d, a, e in pauzes
+                   if d == datum and rijen[0][i["Tijd"]] < a < rijen[-1][i["Tijd"]]]
+        regels.sort(key=lambda x: x[0])
         breuk = " style='page-break-before: always'" if n else ""
         delen.append(f"<h1{breuk}>Lokaal {escape(rc.tekst(lokaal))} · {escape(dag_tekst(datum))}</h1>"
                      f"<p class='sub'>{escape(titel)} · {len(rijen)} studenten · casus {escape(', '.join(casussen) or '–')}</p>"

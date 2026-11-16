@@ -270,6 +270,8 @@ SCENARIOS = {
     "dag_anders": dag_met(simu_rotatie="Nee", casus_na="Na elke pauze afwisselen", ttv_plek="Zo vroeg mogelijk",
                           ttv_eerst="Nee", vrije_plekken="Nee", wissel=10, pauzes="12:30-13:15", middag="13:00",
                           her_beo="Verplicht", rooster_sort="Tijd, dan lokaal"),
+    "dag_op_klas_met_wissels": dag_met(rooster_sort="Klas, dan tijd", uitdraai_sort="Klas, dan tijd", simu_wissels=2),
+    "concept_met_wissels": concept_met(simu_wissels=3, rooster_sort="Tijd, dan lokaal"),
     "dag_krap": dag_krap,
     "dag_fouten": dag_fouten,
     "dag_ongeldige_instellingen": dag_ongeldige_instellingen,

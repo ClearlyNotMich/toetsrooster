@@ -33,12 +33,12 @@ Vast lokaal bepaalt of een simu van lokaal wisselt. Leeg betekent dat de simu me
 
 ### Instellingen
 
-Dit blad maakt het programma zelf aan. Hier staan onder meer de begin- en eindtijd, de pauzes en de toetsduur (standaard 15 minuten, 20 met TTV). Je stelt hier ook in of simu's na elke pauze, na elke toets of nooit van lokaal wisselen, en of de lokalen evenredig gevuld worden zodat iedere beoordelaar studenten krijgt. Dat laatste staat standaard aan.
+Dit blad maakt het programma zelf aan. Hier staan onder meer de begin- en eindtijd, de pauzes en de toetsduur (standaard 15 minuten, 20 met TTV). Je stelt hier ook in of simu's na elke pauze, na elke toets of nooit van lokaal wisselen, hoe vaak ze tussen twee pauzes nog wisselen, en of de lokalen evenredig gevuld worden zodat iedere beoordelaar studenten krijgt. Dat laatste staat standaard aan.
 
 ## Wat eruit komt
 
-- Rooster_Kans1 en Rooster_Her: het complete rooster per lokaal en tijd. Lege plekken staan erin als Vrije plek.
-- Uitdraai_Kans1 en Uitdraai_Her: de versie voor studenten, met alleen naam, lokaal en tijd.
+- Rooster_Kans1 en Rooster_Her: het complete rooster per lokaal, per klas of op tijd (dat kies je bij Instellingen). Begin- en eindtijd staan naast elkaar, tussen de toetsen staat een rij Pauze en lege plekken staan erin als Vrije plek.
+- Uitdraai_Kans1 en Uitdraai_Her: de versie voor studenten, met alleen naam, lokaal en tijd. Sorteer je de uitdraai op klas, dan staat de klas er ook bij.
 - Meldingen: hoeveel studenten er zijn ingeroosterd en waar je naar moet kijken, zoals een student zonder plek, een lokaal waar niemand in komt of een opmerking die het programma heeft meegenomen. Loop dit blad elke keer even door.
 - Vanuit het programma ook een pdf voor docenten (één pagina per lokaal per dag) en een voor studenten, allebei zonder de vrije plekken.
 

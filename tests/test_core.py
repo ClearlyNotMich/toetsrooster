@@ -13,8 +13,9 @@ def plan(modus="kans1", wijzig=None):
 
 
 def rijen(r, blad):
+    """Rijen van een blad als dict; de rijen Pauze van het rooster tellen niet mee."""
     kop, *data = r["bladen"][blad]
-    return [dict(zip(kop, x)) for x in data]
+    return [dict(zip(kop, x)) for x in data if rc.PAUZE not in x]
 
 
 def test_iedereen_ingeroosterd_en_geen_dubbele_boekingen():
@@ -219,4 +220,4 @@ def test_andere_bladnamen():
         b["Deelnemers"] = b.pop("Studenten")
         met(blad_studenten="Deelnemers", blad_rooster1="R1", blad_meldingen="Log")(b)
     r, _ = plan(wijzig=hernoem)
-    assert {"R1", "Log", "Deelnemers", "Uitdraai_Kans1"} <= set(r["bladen"]) and len(r["bladen"]["R1"]) == 13
+    assert {"R1", "Log", "Deelnemers", "Uitdraai_Kans1"} <= set(r["bladen"]) and len(rijen(r, "R1")) == 12

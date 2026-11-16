@@ -46,13 +46,15 @@ const MODI: Map<string, Modus> = new Map<string, Modus>([
 ]);
 const INSTELLINGEN_BLAD: string = "Instellingen";
 const INSTELLINGEN_KOP: string[] = ["Instelling", "Waarde", "Toelichting"];
-const ROOSTER_KOP: string[] = ["Datum", "Tijd", "Lokaal", "Casus", "Vaardigheid", "Beoordelaar", "simucliënt", "stnr",
-    "Voornaam", "vv", "Achternaam", "klas", "bijzheden", "Eindtijd"];
+const ROOSTER_KOP: string[] = ["Datum", "Tijd", "Eindtijd", "Lokaal", "Casus", "Vaardigheid", "Beoordelaar", "simucliënt", "stnr",
+    "Voornaam", "vv", "Achternaam", "klas", "bijzheden"];
 const UITDRAAI_KOP: string[] = ["Naam", "Lokaal", "Tijd"];
 const MELDINGEN_KOP: string[] = ["Soort", "Melding"];
 const EERSTE_KOP: string[] = ["EersteDatum", "EersteTijd", "EersteBeoordelaar", "EersteCasus"];
 const VRIJ: string = "Vrije plek";
 const NIET: string = "NIET INGEROOSTERD";
+const PAUZE: string = "Pauze";
+const OP_KLAS: string = "Klas, dan tijd";
 const VOORKEUREN: string[] = ["Ochtend", "Middag", "Vroeg", "Laat"];
 // Oude waarden in het blad Instellingen die nog geldig zijn.
 const ALIASSEN: Map<string, string> = new Map<string, string>([["simu_rotatie|ja", "Na elke pauze"]]);
@@ -851,9 +853,11 @@ function leesSimuDag(matrix: Matrix, blad: string, fouten: string[], meldingen: 
 }
 
 // Simu per slot. Lokaal k van die dag krijgt bij voorkeur simu (k + stap) mod n, uit iedereen die in dat blok
-// werkt; stap = aantal pauzes ervoor ('Na elke pauze') of het hoeveelste tijdstip van de dag ('Na elke toets').
+// werkt; stap = het hoeveelste deel van de dag ('Na elke pauze': elk blok tussen twee pauzes is 1 deel, plus 1 per
+// 'Wissels tussen twee pauzes') of het hoeveelste tijdstip van de dag ('Na elke toets').
 // Per slot telt alleen wie dan volgens Vanaf/Tot beschikbaar is.
-function simuRotatie(slots: Slot[], simus: SimuDag[], pz: number[][], duur: number, rotatie: string, meldingen: Cel[][]): Map<string, Persoon[]> {
+function simuRotatie(slots: Slot[], simus: SimuDag[], pz: number[][], duur: number, rotatie: string, wissels: number,
+    meldingen: Cel[][]): Map<string, Persoon[]> {
     const blok = (t: number): number => pz.filter((p: number[]) => p[1] <= t).length;
     const kan = (x: SimuDag, a: number, e: number): boolean => (x.van === null || x.van <= a) && (x.tot === null || x.tot >= e);
     const kamers: Map<number, string[]> = new Map<number, string[]>();
@@ -888,7 +892,19 @@ function simuRotatie(slots: Slot[], simus: SimuDag[], pz: number[][], duur: numb
         }
     }
     tijden.forEach((lijst: number[]) => { lijst.sort((a: number, b: number) => a - b); });
-    const stap = (d: number, t: number): number => rotatie === "Na elke pauze" ? blok(t)
+    const deel: Map<string, number> = new Map<string, number>();
+    tijden.forEach((ts: number[], d: number) => {
+        let basis: number = 0;
+        let i: number = 0;
+        while (i < ts.length) {  // ts is gesorteerd, dus de tijden van één blok staan bij elkaar
+            const bt: number[] = ts.filter((t: number) => blok(t) === blok(ts[i]));
+            const n: number = Math.min(wissels + 1, bt.length);
+            bt.forEach((t: number, j: number) => { deel.set(`${d}_${t}`, basis + Math.floor(j * n / bt.length)); });
+            basis += n;
+            i += bt.length;
+        }
+    });
+    const stap = (d: number, t: number): number => rotatie === "Na elke pauze" ? deel.get(`${d}_${t}`) as number
         : rotatie === "Na elke toets" ? (tijden.get(d) as number[]).indexOf(t) : 0;
     kamers.forEach((_: string[], d: number) => {
         if (!simus.some((x: SimuDag) => x.d === null || x.d === d)) {
@@ -1340,7 +1356,7 @@ function maakRooster(bladen: Map<string, Matrix>, modus: string): Resultaat {
         }
     }
     if (simuDag !== null) {
-        simus = simuRotatie(bruikbaar, simuDag, pz, duurNormaal, txt("simu_rotatie"), meldingen);
+        simus = simuRotatie(bruikbaar, simuDag, pz, duurNormaal, txt("simu_rotatie"), num("simu_wissels"), meldingen);
     }
 
     const doel: Student[] = studenten.filter((st: Student) => st.her === (modus === "her"));
@@ -1519,9 +1535,12 @@ function maakRooster(bladen: Map<string, Matrix>, modus: string): Resultaat {
             `krijgt niemand: ${reden}.`]);
     }
 
-    const roosterSleutel = (r: Toewijzing): (string | number)[] => txt("rooster_sort") === "Lokaal, dan tijd"
-        ? [r.slot.d, r.slot.lokaal.toLowerCase(), r.slot.t, r.slot.n]
-        : [r.slot.d, r.slot.t, r.slot.lokaal.toLowerCase(), r.slot.n];
+    // Groep waarbinnen het rooster op tijd staat: een lokaal, een klas (vrije plekken daarna) of de hele dag.
+    const sorteergroep = (r: Toewijzing): (string | number)[] => txt("rooster_sort") === "Lokaal, dan tijd"
+        ? [r.slot.d, r.slot.lokaal.toLowerCase()]
+        : txt("rooster_sort") === OP_KLAS ? [r.slot.d, r.st ? 0 : 1, r.st ? r.st.klas.toLowerCase() : ""] : [r.slot.d];
+    const roosterSleutel = (r: Toewijzing): (string | number)[] =>
+        sorteergroep(r).concat([r.slot.t, r.slot.lokaal.toLowerCase(), r.slot.n]);
     const uitdraaiSleutel = (r: Toewijzing): (string | number)[] => {
         const st: Student = r.st as Student;
         if (txt("uitdraai_sort") === "Achternaam") {
@@ -1529,6 +1548,9 @@ function maakRooster(bladen: Map<string, Matrix>, modus: string): Resultaat {
         }
         if (txt("uitdraai_sort") === "Tijd") {
             return [r.slot.d, r.slot.t, st.achternaam.toLowerCase(), st.i];
+        }
+        if (txt("uitdraai_sort") === OP_KLAS) {
+            return [st.klas.toLowerCase(), r.slot.d, r.slot.t, st.achternaam.toLowerCase(), st.i];
         }
         return [r.slot.d, r.slot.lokaal.toLowerCase(), r.slot.t, st.i];
     };
@@ -1538,11 +1560,23 @@ function maakRooster(bladen: Map<string, Matrix>, modus: string): Resultaat {
     const rooster: Matrix = [ROOSTER_KOP as Cel[]];
     const alles: Toewijzing[] = lijst.concat(vrije);
     alles.sort((x: Toewijzing, y: Toewijzing) => vergelijk(roosterSleutel(x), roosterSleutel(y)));
+    let vorige: Toewijzing | null = null;
     for (const r of alles) {
         const slot: Slot = r.slot;
+        if (vorige !== null && vergelijk(sorteergroep(vorige), sorteergroep(r)) === 0) {
+            // Rij Pauze tussen twee toetsen van dezelfde groep, met datum en tijden in dezelfde kolommen.
+            for (const p of pz) {
+                if (vorige.slot.t < p[0] && p[1] <= slot.t) {
+                    rooster.push([slot.d, p[0] / 1440, p[1] / 1440,
+                        txt("rooster_sort") === "Lokaal, dan tijd" ? slot.lokaal : "", "", "", "", "", "", "", "",
+                        "", r.st && txt("rooster_sort") === OP_KLAS ? r.st.klas : "", PAUZE]);
+                }
+            }
+        }
+        vorige = r;
         if (r.st === null) {
-            rooster.push([slot.d, slot.t / 1440, slot.lokaal, slot.casus, slot.vaardigheid, r.beo, r.simu,
-                "", "", "", "", "", VRIJ, r.eind / 1440]);
+            rooster.push([slot.d, slot.t / 1440, r.eind / 1440, slot.lokaal, slot.casus, slot.vaardigheid, r.beo, r.simu,
+                "", "", "", "", "", VRIJ]);
             continue;
         }
         const st: Student = r.st;
@@ -1562,20 +1596,22 @@ function maakRooster(bladen: Map<string, Matrix>, modus: string): Resultaat {
         if (st.opm) {
             bijz.push(st.opm);
         }
-        rooster.push([slot.d, slot.t / 1440, slot.lokaal, slot.casus, slot.vaardigheid, r.beo, r.simu,
-            st.nr, st.voornaam, st.tv, st.achternaam, st.klas, bijz.join("; "), r.eind / 1440]);
+        rooster.push([slot.d, slot.t / 1440, r.eind / 1440, slot.lokaal, slot.casus, slot.vaardigheid, r.beo, r.simu,
+            st.nr, st.voornaam, st.tv, st.achternaam, st.klas, bijz.join("; ")]);
     }
-    const uitdraai: Matrix = [UITDRAAI_KOP as Cel[]];
+    const opKlas: boolean = txt("uitdraai_sort") === OP_KLAS;
+    const uitdraai: Matrix = [(opKlas ? ["Klas"] : []).concat(UITDRAAI_KOP) as Cel[]];
     lijst.sort((x: Toewijzing, y: Toewijzing) => vergelijk(uitdraaiSleutel(x), uitdraaiSleutel(y)));
     for (const r of lijst) {
         const st: Student = r.st as Student;
         const naam: string = [st.voornaam, st.tv, st.achternaam].filter((x: string) => x !== "").join(" ");
         const tijd: string = tijdTekst(r.slot.t);
-        uitdraai.push([naam, r.slot.lokaal, txt("uitdraai_datum") === "Ja" ? `${datumTekst(r.slot.d)} ${tijd}` : tijd]);
+        uitdraai.push((opKlas ? [st.klas] : []).concat(
+            [naam, r.slot.lokaal, txt("uitdraai_datum") === "Ja" ? `${datumTekst(r.slot.d)} ${tijd}` : tijd]));
     }
     const niet: Student[] = volgorde.filter((st: Student) => !toegewezen.has(st.i)).sort((a: Student, b: Student) => a.i - b.i);
     for (const st of niet) {
-        rooster.push(["", "", "", "", "", "", "", st.nr, st.voornaam, st.tv, st.achternaam, st.klas, NIET, ""]);
+        rooster.push(["", "", "", "", "", "", "", "", st.nr, st.voornaam, st.tv, st.achternaam, st.klas, NIET]);
         meldingen.push(["Waarschuwing", `${st.voornaam} ${st.achternaam} is NIET ingeroosterd: geen vrij lokaal, ` +
             "beoordelaar of simucliënt gevonden (let ook op uitsluitingen en verplichte herkansingsregels)."]);
     }

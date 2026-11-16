@@ -24,13 +24,15 @@ MODI = {
 }
 INSTELLINGEN_BLAD = "Instellingen"
 INSTELLINGEN_KOP = ["Instelling", "Waarde", "Toelichting"]
-ROOSTER_KOP = ["Datum", "Tijd", "Lokaal", "Casus", "Vaardigheid", "Beoordelaar", "simucliënt", "stnr",
-               "Voornaam", "vv", "Achternaam", "klas", "bijzheden", "Eindtijd"]
+ROOSTER_KOP = ["Datum", "Tijd", "Eindtijd", "Lokaal", "Casus", "Vaardigheid", "Beoordelaar", "simucliënt", "stnr",
+               "Voornaam", "vv", "Achternaam", "klas", "bijzheden"]
 UITDRAAI_KOP = ["Naam", "Lokaal", "Tijd"]
 MELDINGEN_KOP = ["Soort", "Melding"]
 EERSTE_KOP = ["EersteDatum", "EersteTijd", "EersteBeoordelaar", "EersteCasus"]
 VRIJ = "Vrije plek"
 NIET = "NIET INGEROOSTERD"
+PAUZE = "Pauze"
+OP_KLAS = "Klas, dan tijd"
 JA_NEE = ["Ja", "Nee"]
 VOORKEUR = ["Voorkeur", "Verplicht", "Maakt niet uit"]
 VOORKEUREN = ["Ochtend", "Middag", "Vroeg", "Laat"]
@@ -86,6 +88,9 @@ INSTELLINGEN = [
     _inst("simu_rotatie", "Simucliënten", "Simu's wisselen van lokaal", "keuze", "Na elke pauze",
           "Na elke pauze of na elke toets schuift elke simucliënt een lokaal door, zodat niemand de hele dag bij "
           "dezelfde toets zit. Nee: iedere simu blijft in hetzelfde lokaal.", SIMU_WISSEL),
+    _inst("simu_wissels", "Simucliënten", "Wissels tussen twee pauzes", "getal", 0,
+          "Zo vaak schuiven de simucliënten tussen twee pauzes nog een lokaal door, gelijk verdeeld over de toetsen "
+          "van dat blok. 0 = alleen na de pauze. Telt alleen bij 'Na elke pauze'.", min_=0, max_=20),
     _inst("deelnaam", "Beoordelaars", "Namen deels vergelijken", "keuze", "Ja",
           "‘Ann’ sluit dan ook ‘Anneke’ uit. Vangt spelfouten op, maar kan te veel uitsluiten.", JA_NEE),
     _inst("her_beo", "Herkansing", "Andere beoordelaar dan 1e kans", "keuze", "Voorkeur",
@@ -95,9 +100,11 @@ INSTELLINGEN = [
     _inst("vrije_plekken", "Uitvoer", "Vrije plekken tonen", "keuze", "Ja",
           "Lege maar bruikbare plekken als 'Vrije plek' in het volledige rooster (nooit op de uitdraai of in de PDF's).", JA_NEE),
     _inst("rooster_sort", "Uitvoer", "Rooster sorteren op", "keuze", "Lokaal, dan tijd",
-          "Volgorde van het volledige rooster (altijd eerst per datum).", ["Lokaal, dan tijd", "Tijd, dan lokaal"]),
+          "Volgorde van het volledige rooster (altijd eerst per datum). Tussen de toetsen staat een rij Pauze.",
+          ["Lokaal, dan tijd", "Tijd, dan lokaal", OP_KLAS]),
     _inst("uitdraai_sort", "Uitvoer", "Uitdraai sorteren op", "keuze", "Achternaam",
-          "Volgorde van de uitdraai voor studenten.", ["Achternaam", "Tijd", "Lokaal, dan tijd"]),
+          "Volgorde van de uitdraai voor studenten. Bij 'Klas, dan tijd' komt er een kolom Klas bij.",
+          ["Achternaam", "Tijd", "Lokaal, dan tijd", OP_KLAS]),
     _inst("uitdraai_datum", "Uitvoer", "Datum op uitdraai", "keuze", "Ja",
           "Nee: alleen de begintijd (handig als alles op één dag is).", JA_NEE),
     _inst("blad_studenten", "Bladnamen", "Blad studenten", "tekst", "Studenten", ""),
@@ -631,7 +638,8 @@ def lees_simu_dag(matrix: list, blad: str, fouten: list, meldingen: list) -> lis
 
 def simu_rotatie(slots: list, simus: list, s: dict, meldingen: list) -> dict:
     """Simu per slot. Lokaal k van die dag krijgt bij voorkeur simu (k + stap) mod n, uit iedereen die in dat blok
-    werkt; stap = aantal pauzes ervoor ('Na elke pauze') of het hoeveelste tijdstip van de dag ('Na elke toets').
+    werkt; stap = het hoeveelste deel van de dag ('Na elke pauze': elk blok tussen twee pauzes is 1 deel, plus 1 per
+    'Wissels tussen twee pauzes') of het hoeveelste tijdstip van de dag ('Na elke toets').
     Per slot telt alleen wie dan volgens Vanaf/Tot beschikbaar is."""
     blok = lambda t: sum(1 for p in s["pauzes"] if p[1] <= t)  # noqa: E731
     kan = lambda x, a, e: (x["van"] is None or x["van"] <= a) and (x["tot"] is None or x["tot"] >= e)  # noqa: E731
@@ -647,7 +655,16 @@ def simu_rotatie(slots: list, simus: list, s: dict, meldingen: list) -> dict:
             ks.append(norm(slot["lokaal"]))
         bereik[sleutel] = [min(a, slot["t"]), max(e, slot["t"] + s["duur"]), ks]
     tijden = {d: sorted({x["t"] for x in slots if x["d"] == d}) for d in kamers}
-    stap = lambda d, t: (blok(t) if s["simu_rotatie"] == "Na elke pauze"  # noqa: E731
+    deel = {}
+    for d, ts in tijden.items():
+        basis = 0
+        for b in sorted({blok(t) for t in ts}):
+            bt = [t for t in ts if blok(t) == b]
+            n = min(s["simu_wissels"] + 1, len(bt))
+            for i, t in enumerate(bt):
+                deel[f"{d}_{t}"] = basis + i * n // len(bt)
+            basis += n
+    stap = lambda d, t: (deel[f"{d}_{t}"] if s["simu_rotatie"] == "Na elke pauze"  # noqa: E731
                          else tijden[d].index(t) if s["simu_rotatie"] == "Na elke toets" else 0)
     for d in kamers:
         if not any(x["d"] is None or x["d"] == d for x in simus):
@@ -1105,24 +1122,41 @@ def maak_rooster(bladen: dict, modus: str) -> dict:
         meldingen.append(("Waarschuwing", f"Lokaal {lok} op {datum_tekst(d)} ({' → '.join(beo_namen) or 'geen beoordelaar'}) "
                           f"krijgt niemand: {reden}."))
 
+    # Groep waarbinnen het rooster op tijd staat: een lokaal, een klas (vrije plekken daarna) of de hele dag.
     if s["rooster_sort"] == "Lokaal, dan tijd":
-        rooster_sleutel = lambda r: (r["slot"]["d"], r["slot"]["lokaal"].lower(), r["slot"]["t"], r["slot"]["n"])  # noqa: E731
+        sorteergroep = lambda r: (r["slot"]["d"], r["slot"]["lokaal"].lower())  # noqa: E731
+    elif s["rooster_sort"] == OP_KLAS:
+        sorteergroep = lambda r: (r["slot"]["d"], 0 if r["st"] else 1, r["st"]["klas"].lower() if r["st"] else "")  # noqa: E731
     else:
-        rooster_sleutel = lambda r: (r["slot"]["d"], r["slot"]["t"], r["slot"]["lokaal"].lower(), r["slot"]["n"])  # noqa: E731
+        sorteergroep = lambda r: (r["slot"]["d"],)  # noqa: E731
+    rooster_sleutel = lambda r: (*sorteergroep(r), r["slot"]["t"], r["slot"]["lokaal"].lower(), r["slot"]["n"])  # noqa: E731
     if s["uitdraai_sort"] == "Achternaam":
         uitdraai_sleutel = lambda r: (r["st"]["achternaam"].lower(), r["st"]["voornaam"].lower(), r["st"]["i"])  # noqa: E731
     elif s["uitdraai_sort"] == "Tijd":
         uitdraai_sleutel = lambda r: (r["slot"]["d"], r["slot"]["t"], r["st"]["achternaam"].lower(), r["st"]["i"])  # noqa: E731
+    elif s["uitdraai_sort"] == OP_KLAS:
+        uitdraai_sleutel = lambda r: (r["st"]["klas"].lower(), r["slot"]["d"], r["slot"]["t"],  # noqa: E731
+                                      r["st"]["achternaam"].lower(), r["st"]["i"])
     else:
         uitdraai_sleutel = lambda r: (r["slot"]["d"], r["slot"]["lokaal"].lower(), r["slot"]["t"], r["st"]["i"])  # noqa: E731
 
     rooster = [ROOSTER_KOP]
-    uitdraai = [UITDRAAI_KOP]
+    op_klas = s["uitdraai_sort"] == OP_KLAS
+    uitdraai = [["Klas"] + UITDRAAI_KOP if op_klas else UITDRAAI_KOP]
+    vorige = None
     for r in sorted(list(toegewezen.values()) + vrije, key=rooster_sleutel):
         st, slot = r["st"], r["slot"]
+        if vorige and sorteergroep(vorige) == sorteergroep(r):
+            # Rij Pauze tussen twee toetsen van dezelfde groep, met datum en tijden in dezelfde kolommen.
+            for p in pz:
+                if vorige["slot"]["t"] < p[0] and p[1] <= slot["t"]:
+                    rooster.append([slot["d"], p[0] / 1440, p[1] / 1440,
+                                    slot["lokaal"] if s["rooster_sort"] == "Lokaal, dan tijd" else "", "", "", "", "", "", "", "",
+                                    "", st["klas"] if st and s["rooster_sort"] == OP_KLAS else "", PAUZE])
+        vorige = r
         if st is None:
-            rooster.append([slot["d"], slot["t"] / 1440, slot["lokaal"], slot["casus"], slot["vaardigheid"], r["beo"],
-                            r["simu"], "", "", "", "", "", VRIJ, r["eind"] / 1440])
+            rooster.append([slot["d"], slot["t"] / 1440, r["eind"] / 1440, slot["lokaal"], slot["casus"], slot["vaardigheid"],
+                            r["beo"], r["simu"], "", "", "", "", "", VRIJ])
             continue
         naam = f"{st['voornaam']} {st['achternaam']}"
         bijz = [f"TTV ({s['ttv']} min)"] if st["ttv"] else []
@@ -1137,16 +1171,17 @@ def maak_rooster(bladen: dict, modus: str) -> dict:
                               f"({tijd_tekst(slot['t'])})."))
         if st["opm"]:
             bijz.append(st["opm"])
-        rooster.append([slot["d"], slot["t"] / 1440, slot["lokaal"], slot["casus"], slot["vaardigheid"], r["beo"], r["simu"],
-                        st["nr"], st["voornaam"], st["tv"], st["achternaam"], st["klas"], "; ".join(bijz), r["eind"] / 1440])
+        rooster.append([slot["d"], slot["t"] / 1440, r["eind"] / 1440, slot["lokaal"], slot["casus"], slot["vaardigheid"], r["beo"],
+                        r["simu"], st["nr"], st["voornaam"], st["tv"], st["achternaam"], st["klas"], "; ".join(bijz)])
     for r in sorted(toegewezen.values(), key=uitdraai_sleutel):
         st = r["st"]
         naam = " ".join(x for x in (st["voornaam"], st["tv"], st["achternaam"]) if x)
         tijd = tijd_tekst(r["slot"]["t"])
-        uitdraai.append([naam, r["slot"]["lokaal"], f"{datum_tekst(r['slot']['d'])} {tijd}" if s["uitdraai_datum"] == "Ja" else tijd])
+        uitdraai.append(([st["klas"]] if op_klas else []) +
+                        [naam, r["slot"]["lokaal"], f"{datum_tekst(r['slot']['d'])} {tijd}" if s["uitdraai_datum"] == "Ja" else tijd])
     niet = [st for st in volgorde if st["i"] not in toegewezen]
     for st in sorted(niet, key=lambda x: x["i"]):
-        rooster.append(["", "", "", "", "", "", "", st["nr"], st["voornaam"], st["tv"], st["achternaam"], st["klas"], NIET, ""])
+        rooster.append(["", "", "", "", "", "", "", "", st["nr"], st["voornaam"], st["tv"], st["achternaam"], st["klas"], NIET])
         meldingen.append(("Waarschuwing", f"{st['voornaam']} {st['achternaam']} is NIET ingeroosterd: geen vrij lokaal, "
                           "beoordelaar of simucliënt gevonden (let ook op uitsluitingen en verplichte herkansingsregels)."))
     if vrije:

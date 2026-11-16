@@ -30,7 +30,7 @@ def test_app_maakt_en_bewaart(tmp_path):
     assert set(sjabloon) == {"Studenten", "Toetsdag_Kans1", "Toetsdag_Her", "Simu", "Instellingen"}
     assert rc.maak_rooster(sjabloon, "kans1")["fouten"] == []  # leeg maar geldig
     her = rc.lees_werkmap(tmp_path / "controle-Rooster_Her.xlsx")["Rooster_Her"]
-    assert sum(1 for rij in her[1:] if rc.VRIJ not in rij) == 2
+    assert sum(1 for rij in her[1:] if rc.VRIJ not in rij and rc.PAUZE not in rij) == 2
 
 
 def test_origineel_wordt_niet_overschreven(tmp_path, monkeypatch):
@@ -157,7 +157,9 @@ def test_vrije_plekken_niet_in_pdf(tmp_path):
     rooster = r["bladen"]["Rooster_Kans1"]
     assert sum(rc.VRIJ in rij for rij in rooster) == 24 and v.stat_in.waarde.text() == "61 / 61"
     html = uitvoer.html_rooster("t", rooster) + uitvoer.html_uitdraai("t", r["bladen"]["Uitdraai_Kans1"])
-    assert rc.VRIJ not in html and html.count("<tr>") == 61 + 61 + 5 + 1  # 5 lokaalpagina's met kop, 1 uitdraaikop
+    # 5 lokaalpagina's met kop en per lokaal de pauzes tussen de toetsen, 1 uitdraaikop
+    assert rc.VRIJ not in html and html.count("<tr>") == 61 + 61 + 5 + 1 + html.count(f"<td>{rc.PAUZE}</td>")
+    assert html.count(f"<td>{rc.PAUZE}</td>") == 12 and "<td>11:15–11:40</td><td>Pauze</td>" in html
 
 
 def test_concept_in_werkmap_en_import_zonder_passende_kolom(tmp_path):
@@ -181,7 +183,7 @@ def test_concept_in_werkmap_en_import_zonder_passende_kolom(tmp_path):
     v.bladen["Simu"] = mv.concept_bladen()["Simu"]
     r = v.maak()
     assert r["fouten"] == [] and v.stat_in.waarde.text() == "61 / 61"
-    assert {rij[2] for rij in r["bladen"]["Rooster_Kans1"][1:]} == {"A1", "A2", "B1", "B2", "C1", "Praktijkhuis", "C2"}
+    assert {rij[3] for rij in r["bladen"]["Rooster_Kans1"][1:]} == {"A1", "A2", "B1", "B2", "C1", "Praktijkhuis", "C2"}
 
 
 def test_wisselen_van_toets_houdt_alles_en_alles_wissen(tmp_path, monkeypatch):
@@ -234,9 +236,9 @@ def test_simus_vast_lokaal_in_app(tmp_path):
         return True
     assert v.simus_instellen(kies)
     r = v.maak()
-    rooster = r["bladen"]["Rooster_Kans1"]
-    assert {rij[2] for rij in rooster[1:] if rij[6] == "Siem"} == {"C2"} and {rij[2] for rij in rooster[1:] if rij[6] == "Tom"} == {"A1"}
-    assert len({rij[6] for rij in rooster[1:] if rij[2] == "B1"}) > 1
+    rooster = [rij for rij in r["bladen"]["Rooster_Kans1"] if rc.PAUZE not in rij]
+    assert {rij[3] for rij in rooster[1:] if rij[7] == "Siem"} == {"C2"} and {rij[3] for rij in rooster[1:] if rij[7] == "Tom"} == {"A1"}
+    assert len({rij[7] for rij in rooster[1:] if rij[3] == "B1"}) > 1
     uit = rc.lees_werkmap(v.opslaan(str(tmp_path / "uit.xlsx")))["Simu"]
     assert uit[0][4:6] == ["Vast lokaal", "Kan spelen"] and [r_[4] for r_ in uit[1:3]] == ["C2", "Ja"] and uit[3][5] == "vrouw"
     assert all("vrouw" in rij[3] for rij in rooster[1:] if rij[6] == "Uma")

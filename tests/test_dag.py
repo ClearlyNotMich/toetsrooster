@@ -13,8 +13,9 @@ def plan(modus="kans1", wijzig=None):
 
 
 def rijen(r, blad="Rooster_Kans1"):
+    """Rijen van een blad als dict; de rijen Pauze van het rooster tellen niet mee."""
     kop, *data = r["bladen"][blad]
-    return [dict(zip(kop, x)) for x in data]
+    return [dict(zip(kop, x)) for x in data if rc.PAUZE not in x]
 
 
 def tijd(x):
@@ -100,6 +101,51 @@ def test_simus_rouleren_per_blok():
         assert x["simucliënt"] == simus[(lokalen.index(x["Lokaal"]) + blok) % 5], (x["Lokaal"], tijd(x["Tijd"]))
     r = plan(wijzig=met(simu_rotatie="Nee"))
     assert {(x["Lokaal"], x["simucliënt"]) for x in rijen(r)} == set(zip(lokalen, simus))
+
+
+def test_simus_wisselen_ook_tussen_twee_pauzes():
+    alle = rijen(plan(wijzig=met(simu_wissels=1)))
+    simus = ["Siem", "Tom", "Uma", "Vera", "Wout"]
+    lokalen = ["C1.33-1", "C1.33-2", "C1.23-1", "C1.23-2", "C1.39"]
+    # Elk blok in twee delen: 5 toetsen worden 3 + 2, 4 toetsen 2 + 2. Na elk deel schuift iedereen een lokaal door.
+    stap = dict(zip([rc.tijd_tekst(t) for t in rc.tijdgrid(rc.lees_instellingen(None, []))],
+                    [0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7]))
+    assert sum(x["bijzheden"] != rc.VRIJ for x in alle) == 61
+    for x in alle:
+        assert x["simucliënt"] == simus[(lokalen.index(x["Lokaal"]) + stap[tijd(x["Tijd"])]) % 5], (x["Lokaal"], tijd(x["Tijd"]))
+    fouten = []
+    rc.lees_instellingen(rc.instellingen_matrix({"simu_wissels": "veel"}), fouten)
+    assert "Wissels tussen twee pauzes" in fouten[0]
+
+
+def test_rij_pauze_en_eindtijd_in_kolom_c():
+    kop, *data = plan()["bladen"]["Rooster_Kans1"]
+    assert kop[:4] == ["Datum", "Tijd", "Eindtijd", "Lokaal"] and kop[-1] == "bijzheden"
+    pauzes = [x for x in data if x[-1] == rc.PAUZE]
+    # Per lokaal de pauzes tussen de toetsen, met datum, van en tot in dezelfde kolommen als de andere rijen.
+    assert len(pauzes) == 15 and all(x[0] == data[0][0] and x[4:13] == [""] * 9 for x in pauzes)
+    assert [(tijd(x[1]), tijd(x[2]), x[3]) for x in pauzes[:3]] == [
+        ("11:15", "11:40", "C1.23-1"), ("13:00", "13:55", "C1.23-1"), ("15:15", "15:40", "C1.23-1")]
+    i = data.index(pauzes[0])
+    assert (tijd(data[i - 1][1]), tijd(data[i + 1][1])) == ("11:00", "11:45")
+    # Op tijd gesorteerd: één rij per pauze voor alle lokalen samen.
+    kop, *data = plan(wijzig=met(rooster_sort="Tijd, dan lokaal"))["bladen"]["Rooster_Kans1"]
+    assert [(tijd(x[1]), x[3]) for x in data if x[-1] == rc.PAUZE] == [("11:15", ""), ("13:00", ""), ("15:15", "")]
+    # Zonder pauzes geen rij Pauze.
+    assert not [x for x in plan(wijzig=met(pauzes=""))["bladen"]["Rooster_Kans1"] if rc.PAUZE in x]
+
+
+def test_sorteren_op_klas():
+    r = plan(wijzig=met(rooster_sort="Klas, dan tijd", uitdraai_sort="Klas, dan tijd"))
+    alle = rijen(r)
+    klassen = [x["klas"] for x in alle if x["bijzheden"] != rc.VRIJ]
+    assert klassen == sorted(klassen) and set(klassen) == {"P2A", "P2B", "P2C"}
+    assert all(x["bijzheden"] == rc.VRIJ for x in alle[61:]) and len(alle) == 85  # vrije plekken na de klassen
+    for klas in set(klassen):
+        tijden = [x["Tijd"] for x in alle if x["klas"] == klas]
+        assert tijden == sorted(tijden)
+    uitdraai = r["bladen"]["Uitdraai_Kans1"]
+    assert uitdraai[0] == ["Klas", "Naam", "Lokaal", "Tijd"] and [x[0] for x in uitdraai[1:]] == klassen
 
 
 def test_simu_vanaf_tot_en_te_weinig():

@@ -36,6 +36,8 @@ In het blad Simu staat per dag wie er is, eventueel met een begin- en eindtijd. 
 
 Zodat simu's niet de hele dag dezelfde casus spelen, wisselen ze van lokaal. Bij de instellingen kies je wanneer: na elke pauze (standaard), na elke toets, of nooit.
 
+Wil je dat ze ook tussen twee pauzes wisselen, vul dan bij Wissels tussen twee pauzes in hoe vaak. De wissels worden gelijk verdeeld over de toetsen van dat blok. Bij 1 wissel en een blok van vijf toetsen schuift iedereen na de derde toets een lokaal door, en na de pauze weer.
+
 Per simu kun je twee dingen instellen, in het blad Simu of met de knop Simucliënten in het programma:
 - Vast lokaal: leeg betekent dat de simu meewisselt. Ja betekent dat de simu in één lokaal blijft. Je kunt ook een lokaalnaam invullen.
 - Kan spelen: welke casussen de simu kan spelen, bijvoorbeeld vrouw, of P1, P2. Het woord moet als heel woord in de naam van de casus staan. Leeg betekent alles.
@@ -103,10 +105,11 @@ Meldingen die geen fout zijn, zoals een simu die twee keer voorkomt, staan er oo
 
 ## Wat je terugkrijgt
 
-- Het volledige rooster, met lege plekken als Vrije plek.
-- Een uitdraai voor studenten, met alleen naam, lokaal en tijd.
+- Het volledige rooster, met lege plekken als Vrije plek. De eindtijd staat in kolom C, naast de begintijd. Je sorteert het per lokaal, per klas of op tijd.
+- In het rooster een rij Pauze tussen de toetsen, met de datum in kolom A en de tijden van de pauze. Per lokaal of per klas staat die rij er alleen als er voor en na de pauze een toets of vrije plek staat.
+- Een uitdraai voor studenten, met alleen naam, lokaal en tijd. Sorteer je die op klas, dan komt de klas erbij.
 - De meldingen.
-- In het programma ook een pdf voor docenten (een pagina per lokaal) en een pdf voor studenten. Vrije plekken staan niet in de uitdraai en niet in de pdf's.
+- In het programma ook een pdf voor docenten (een pagina per lokaal) en een pdf voor studenten. Vrije plekken staan niet in de uitdraai en niet in de pdf's. De pauzes staan wel in de pdf voor docenten.
 
 ## Wat het nog niet kan
 
@@ -137,12 +140,13 @@ Deze staan in het blad Instellingen en op de pagina Instellingen in het programm
 | TTV | TTV-studenten eerst inroosteren | Ja | Geeft TTV-studenten als eerste een plek, zodat de beste plekken voor hen vrij zijn. Keuzes: Ja / Nee. |
 | Voorkeur | Middag begint om | 12:00 | Grens tussen voorkeur ochtend en middag. |
 | Simucliënten | Simu's wisselen van lokaal | Na elke pauze | Na elke pauze of na elke toets schuift elke simucliënt een lokaal door, zodat niemand de hele dag bij dezelfde toets zit. Nee: iedere simu blijft in hetzelfde lokaal. Keuzes: Na elke pauze / Na elke toets / Nee. |
+| Simucliënten | Wissels tussen twee pauzes | 0 | Zo vaak schuiven de simucliënten tussen twee pauzes nog een lokaal door, gelijk verdeeld over de toetsen van dat blok. 0 = alleen na de pauze. Telt alleen bij 'Na elke pauze'. |
 | Beoordelaars | Namen deels vergelijken | Ja | ‘Ann’ sluit dan ook ‘Anneke’ uit. Vangt spelfouten op, maar kan te veel uitsluiten. Keuzes: Ja / Nee. |
 | Herkansing | Andere beoordelaar dan 1e kans | Voorkeur | Verplicht: lukt het niet, dan wordt de student niet ingeroosterd. Keuzes: Voorkeur / Verplicht / Maakt niet uit. |
 | Herkansing | Andere casus dan 1e kans | Voorkeur | Verplicht: lukt het niet, dan wordt de student niet ingeroosterd. Keuzes: Voorkeur / Verplicht / Maakt niet uit. |
 | Uitvoer | Vrije plekken tonen | Ja | Lege maar bruikbare plekken als 'Vrije plek' in het volledige rooster (nooit op de uitdraai of in de PDF's). Keuzes: Ja / Nee. |
-| Uitvoer | Rooster sorteren op | Lokaal, dan tijd | Volgorde van het volledige rooster (altijd eerst per datum). Keuzes: Lokaal, dan tijd / Tijd, dan lokaal. |
-| Uitvoer | Uitdraai sorteren op | Achternaam | Volgorde van de uitdraai voor studenten. Keuzes: Achternaam / Tijd / Lokaal, dan tijd. |
+| Uitvoer | Rooster sorteren op | Lokaal, dan tijd | Volgorde van het volledige rooster (altijd eerst per datum). Tussen de toetsen staat een rij Pauze. Keuzes: Lokaal, dan tijd / Tijd, dan lokaal / Klas, dan tijd. |
+| Uitvoer | Uitdraai sorteren op | Achternaam | Volgorde van de uitdraai voor studenten. Bij 'Klas, dan tijd' komt er een kolom Klas bij. Keuzes: Achternaam / Tijd / Lokaal, dan tijd / Klas, dan tijd. |
 | Uitvoer | Datum op uitdraai | Ja | Nee: alleen de begintijd (handig als alles op één dag is). Keuzes: Ja / Nee. |
 | Bladnamen | Blad studenten | Studenten | Naam van het blad. |
 | Bladnamen | Blad toetsdag eerste kans | Toetsdag_Kans1 | Naam van het blad. |
