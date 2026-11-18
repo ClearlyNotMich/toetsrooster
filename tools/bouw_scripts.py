@@ -29,6 +29,9 @@ def regels() -> str:
     # Alles na de markering in docs/REGELS.md is de tabel met instellingen.
     markering = "<!-- tabel: gegenereerd uit rooster_core.INSTELLINGEN -->\n"
     tekst = (ROOT / "docs" / "REGELS.md").read_text(encoding="utf-8")
+    if any(not r.startswith("|") for r in tekst[tekst.index(markering) + len(markering):].splitlines()):
+        sys.exit("docs/REGELS.md: na de tabel met instellingen staat nog tekst; zet die boven de markering, "
+                 "anders gaat hij verloren. Er is niets geschreven.")
     rijen = [f"| {i['groep']} | {i['label']} | {i['standaard']} | {toelichting(i) or 'Naam van het blad.'} |\n" for i in INSTELLINGEN]
     return tekst[:tekst.index(markering) + len(markering)] + "| Groep | Instelling | Standaard | Uitleg |\n|---|---|---|---|\n" + "".join(rijen)
 

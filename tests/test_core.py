@@ -82,7 +82,8 @@ def test_eerste_kans_schrijft_juiste_kolommen():
     i = kop.index
     anna = data[0]
     assert anna[i("TTV")] == "Nee" and anna[i("IsHerkanser")] == "Nee"  # niet overschreven (oude fout)
-    assert anna[i("EersteDatum")] == 46128 and anna[i("EersteBeoordelaar")] == "Ann" and anna[i("EersteCasus")] == "XY"
+    rooster = [x for x in rijen(r, "Rooster_Kans1") if x["Voornaam"] == anna[i("Voornaam")]][0]
+    assert anna[i("EersteDatum")] == 46128 and anna[i("EersteBeoordelaar")] == "Ann" and anna[i("EersteCasus")] == rooster["Casus"] != ""
     mila = data[12]
     assert mila[i("EersteBeoordelaar")] == "Ann"  # herkanser: eerste-kansgegevens blijven staan
 

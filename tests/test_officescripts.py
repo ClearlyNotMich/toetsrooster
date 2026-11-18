@@ -20,6 +20,19 @@ def test_scripts_zijn_actueel():
     assert subprocess.run([sys.executable, str(ROOT / "tools" / "bouw_scripts.py"), "--check"]).returncode == 0
 
 
+def test_tekst_na_tabel_gaat_niet_verloren(tmp_path, monkeypatch):
+    import bouw_scripts
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "REGELS.md").write_text("# Regels\n<!-- tabel: gegenereerd uit rooster_core.INSTELLINGEN -->\n"
+                                              "| a | b |\n\n## Nog een stuk\n", encoding="utf-8")
+    monkeypatch.setattr(bouw_scripts, "ROOT", tmp_path)
+    with pytest.raises(SystemExit, match="na de tabel"):
+        bouw_scripts.regels()
+    # alleen tabelrijen na de markering: gewoon opnieuw maken
+    (tmp_path / "docs" / "REGELS.md").write_text("<!-- tabel: gegenereerd uit rooster_core.INSTELLINGEN -->\n| a |\n", encoding="utf-8")
+    assert "| Groep | Instelling |" in bouw_scripts.regels()
+
+
 @pytest.fixture(scope="module")
 def gecompileerd(tmp_path_factory):
     tsc = ROOT / "node_modules" / "typescript" / "bin" / "tsc"  # via node: werkt ook op Windows
@@ -142,6 +155,39 @@ def dag_simu_invoerfouten():
     b = mv.dag_bladen()
     b["Simu"] = [b["Simu"][0]] + [[mv.TOETS, n, "10:00", "17:00"] for n in ("Siem", "Tom", "Uma", "Vera", "Wout", "Siem", "Tom")]
     b["Simu"].append([mv.HER + 1, "Xan", "", ""])
+    return b
+
+
+def dag_klassen(rijen_, **waarden):
+    """Toetsdag met klassen mengen: per studentrij (index) de kolommen die anders moeten."""
+    def maak():
+        b = dag_met(**waarden)()
+        for i, kolommen in rijen_.items():
+            for k, v in kolommen.items():
+                b["Studenten"][i][k] = v
+        return b
+    return maak
+
+
+def dag_twee_dagen():
+    b = mv.dag_bladen()
+    b["Toetsdag_Kans1"] += [[mv.TOETS + 1] + r[1:] for r in b["Toetsdag_Kans1"][1:4]]
+    b["Simu"] += [[mv.TOETS + 1] + r[1:] for r in b["Simu"][1:4]]
+    return b
+
+
+def dag_herkansing_verplicht():
+    # Een op de drie studenten herkanst, afwisselend bij Ann en Bram geweest.
+    b = dag_met(klas_mengen="Verplicht")()
+    for n, rij in enumerate(b["Studenten"][1:61:3]):
+        rij[9:14] = ["Ja", mv.TOETS, 0.4, "Ann" if n % 2 else "Bram", "Q 1" if n % 2 else "R 2"]
+    return b
+
+
+def dag_valt_terug_op_nee():
+    from test_dag import vier_studenten
+    b = mv.dag_bladen()
+    vier_studenten(b)
     return b
 
 
@@ -274,6 +320,13 @@ SCENARIOS = {
     "concept_met_wissels": concept_met(simu_wissels=3, rooster_sort="Tijd, dan lokaal"),
     "dag_klassen_verplicht": dag_met(klas_mengen="Verplicht"),
     "dag_klassen_nee": dag_met(klas_mengen="Nee"),
+    "dag_klassen_zonder_klas": dag_klassen({i: {4: ""} for i in (3, 4, 25, 26, 27, 50)}),
+    "dag_klassen_zonder_klas_verplicht": dag_klassen({i: {4: ""} for i in (3, 4, 25, 26, 27, 50)}, klas_mengen="Verplicht"),
+    "dag_klassen_spelling": dag_klassen({3: {4: "p2a"}, 8: {4: "P2 A"}, 25: {4: " p2-b "}, 50: {4: "P2c"}}, klas_mengen="Verplicht"),
+    "dag_klassen_laat": dag_klassen({i: {7: "Laat"} for i in (2, 3, 24, 40, 41, 55)}),
+    "dag_twee_dagen": dag_twee_dagen,
+    "dag_herkansing_verplicht": dag_herkansing_verplicht,
+    "dag_valt_terug_op_nee": dag_valt_terug_op_nee,
     "dag_krap": dag_krap,
     "dag_fouten": dag_fouten,
     "dag_ongeldige_instellingen": dag_ongeldige_instellingen,

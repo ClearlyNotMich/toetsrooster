@@ -203,6 +203,53 @@ def test_klassen_mengen_verplicht_lukt_niet():
     assert not [x for x in rijen(r) if x["bijzheden"] == rc.NIET] and not any("Klassen mengen" in m[1] for m in r["meldingen"])
 
 
+def test_klassen_mengen_naar_verhouding():
+    # 10 P2A, 10 P2B en 30 P2C; P2C mag niet bij Dirk (C1.23-2). Om en om op rang zou de rest van P2C aan het eind komen.
+    def ongelijk(klas_mengen):
+        def wijzig(b):
+            b["Studenten"] = b["Studenten"][:51]
+            for k, rij in enumerate(b["Studenten"][1:]):
+                rij[4] = "P2A" if k < 10 else "P2B" if k < 20 else "P2C"
+                rij[5:9] = ["Dirk" if rij[4] == "P2C" else "", "", "", ""]
+            met(klas_mengen=klas_mengen)(b)
+        return wijzig
+    uit = {}
+    for lok, xs in per_lokaal(rijen(plan(wijzig=ongelijk("Afwisselen")))).items():
+        studenten = [i for i, x in enumerate(xs) if x["bijzheden"] != rc.VRIJ]
+        uit[lok] = (len(studenten), len(xs) - 1 - studenten[-1])
+    dirk = uit.pop("C1.23-2")
+    # Dirk 9 studenten (Nee: 4; om en om op rang: 6) en aan het eind hooguit één lege plek meer dan het lokaal met de meeste (Nee: 13 tegen 5-6).
+    assert sum(n for n, _ in uit.values()) + dirk[0] == 50 and dirk[0] >= 9 and dirk[1] <= max(e for _, e in uit.values()) + 1
+
+
+def vier_studenten(b):
+    """Twee lokalen met twee plekken (09:40, 10:00); Carla (P2A) mag niet bij Bram, Daan zit in P2B."""
+    b["Toetsdag_Kans1"] = b["Toetsdag_Kans1"][:3]
+    b["Simu"] = b["Simu"][:3]
+    b["Studenten"] = b["Studenten"][:5]
+    for rij, (klas, niet) in zip(b["Studenten"][1:], [("P2A", ""), ("P2A", ""), ("P2A", "Bram"), ("P2B", "")]):
+        rij[4:9] = [klas, niet, "", "", ""]
+    met(eind="10:20", pauzes="")(b)
+
+
+def test_klassen_mengen_kost_nooit_een_plek():
+    # Om en om komt Daan (P2B) voor Carla en neemt de laatste plek bij Ann; dan kan Carla nergens meer heen.
+    def met_mengen(klas_mengen):
+        def wijzig(b):
+            vier_studenten(b)
+            met(klas_mengen=klas_mengen)(b)
+        return wijzig
+    afw, nee = plan(wijzig=met_mengen("Afwisselen")), plan(wijzig=met_mengen("Nee"))
+    assert afw["bladen"]["Rooster_Kans1"] == nee["bladen"]["Rooster_Kans1"] and not any(x["bijzheden"] == rc.NIET for x in rijen(afw))
+    melding = [m for m in afw["meldingen"] if "niet gemengd" in m[1]]
+    assert melding == [("Waarschuwing", "Klassen mengen: de klassen zijn voor dit rooster niet gemengd, omdat anders "
+                                         "1 student(en) geen plek hadden gekregen.")]
+    assert not any("niet gemengd" in m[1] for m in nee["meldingen"])
+    # Verplicht valt niet terug.
+    verplicht = plan(wijzig=met_mengen("Verplicht"))
+    assert not any("niet gemengd" in m[1] for m in verplicht["meldingen"])
+
+
 def test_simu_vanaf_tot_en_te_weinig():
     def wim_ochtend(b):
         b["Simu"][5][3] = "12:00"

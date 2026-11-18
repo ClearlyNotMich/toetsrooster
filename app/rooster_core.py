@@ -71,9 +71,10 @@ INSTELLINGEN = [
           "ongeveer evenveel krijgt, ook als er minder simu's dan lokalen zijn. Op volgorde: eerst de bovenste lokalen.",
           ["Evenredig", "Op volgorde"]),
     _inst("klas_mengen", "Toetsdag", "Klassen mengen", "keuze", "Afwisselen",
-          "Afwisselen: de klassen om en om inroosteren en in een lokaal liefst geen twee studenten uit dezelfde klas na "
-          "elkaar; dat kost nooit een plek. Verplicht: nooit twee na elkaar; lukt dat niet, dan wordt de student niet "
-          "ingeroosterd (vooral als een beoordelaar maar één klas mag krijgen). Nee: op volgorde van het blad Studenten.",
+          "Afwisselen: elke klas naar verhouding over de dag verdelen en in een lokaal liefst geen twee studenten uit "
+          "dezelfde klas na elkaar; dat kost nooit een plek, wel soms een andere of latere tijd (zou er iemand zonder plek "
+          "blijven, dan wordt niet gemengd, zie Meldingen). Verplicht: nooit twee na elkaar; lukt dat niet, dan wordt "
+          "de student niet ingeroosterd (vooral als een beoordelaar maar één klas mag krijgen). Nee: op volgorde van het blad Studenten.",
           ["Afwisselen", "Verplicht", "Nee"]),
     _inst("jaar", "Toetsduur", "Jaar", "getal", 1, "Studiejaar van deze toets; bepaalt welke duur hieronder geldt.", min_=1, max_=2),
     _inst("duur1", "Toetsduur", "Toetsduur jaar 1 (min)", "getal", 15, "Gewone toets in jaar 1.", min_=1, max_=480),
@@ -1011,17 +1012,20 @@ def maak_rooster(bladen: dict, modus: str) -> dict:
 
     doel = [st for st in studenten if st["her"] == (modus == HER)]
     groep = lambda st: 0 if s["ttv_eerst"] == "Ja" and st["ttv"] else 1 if st["voorkeur"] else 2  # noqa: E731
-    # Klassen mengen: per groep om en om uit elke klas (klassen in de volgorde van het blad).
-    mengen = s["klas_mengen"] != "Nee"
+    # Klassen mengen: per groep om en om uit elke klas, elke klas naar verhouding over de hele dag verdeeld
+    # (bij gelijke stand de klassen in de volgorde van het blad).
     klassen: dict = {}
-    rang: dict = {}
-    plek: dict = {}
+    grootte: dict = {}
     for st in doel:
         klassen.setdefault(norm(st["klas"]), len(klassen))
         k = (groep(st), norm(st["klas"]))
+        grootte[k] = grootte.get(k, 0) + 1
+    rang: dict = {}
+    plek: dict = {}
+    for st in doel:
+        k = (groep(st), norm(st["klas"]))
         rang[k] = rang.get(k, -1) + 1
-        plek[st["i"]] = (rang[k], klassen[k[1]]) if mengen else (0, 0)
-    volgorde = sorted(doel, key=lambda st: (groep(st), *plek[st["i"]], st["i"]))
+        plek[st["i"]] = ((rang[k] + 0.5) / grootte[k], klassen[k[1]])
     gewoon = sorted(bruikbaar, key=lambda x: (x["d"], x["t"], x["n"]))
     mid = s["middag"]
     per_voorkeur = {
@@ -1088,7 +1092,7 @@ def maak_rooster(bladen: dict, modus: str) -> dict:
     def geordend(lijst, st):
         # Binnen hetzelfde tijdstip eerst een lokaal met andere klassen ernaast ('Afwisselen'), dan het lokaal met de
         # minste studenten ('Evenredig'); de tijdvolgorde blijft gelijk.
-        afwisselen = s["klas_mengen"] == "Afwisselen"
+        afwisselen = km == "Afwisselen"
         if s["verdelen"] != "Evenredig" and not afwisselen:
             return lijst
         groep: dict = {}
@@ -1105,7 +1109,7 @@ def maak_rooster(bladen: dict, modus: str) -> dict:
                 continue
             if anders("her_casus", strikt) and st["ec"] and norm(slot["casus"]) == norm(st["ec"]):
                 continue
-            if s["klas_mengen"] == "Verplicht" and not andere_buren(slot, st):
+            if km == "Verplicht" and not andere_buren(slot, st):
                 continue
             r = boek(slot, a, b, st, strikt)
             if r:
@@ -1114,13 +1118,34 @@ def maak_rooster(bladen: dict, modus: str) -> dict:
                 return r
         return None
 
-    toegewezen: dict = {}
-    for strikt in ([True, False] if modus == HER else [False]):
-        for st in volgorde:
-            if st["i"] not in toegewezen:
-                r = probeer(st, strikt)
-                if r:
-                    toegewezen[st["i"]] = r
+    def plan():
+        # Alle studenten plaatsen met Klassen mengen = km; begint steeds met een leeg rooster.
+        bezet.clear()
+        aantal.clear()
+        geplaatst.clear()
+        volgorde = sorted(doel, key=lambda st: (groep(st), *(plek[st["i"]] if km != "Nee" else (0, 0)), st["i"]))
+        toegewezen: dict = {}
+        for strikt in ([True, False] if modus == HER else [False]):
+            for st in volgorde:
+                if st["i"] not in toegewezen:
+                    r = probeer(st, strikt)
+                    if r:
+                        toegewezen[st["i"]] = r
+        return toegewezen
+
+    km = s["klas_mengen"]
+    toegewezen = plan()
+    if km == "Afwisselen" and len(toegewezen) < len(doel):
+        # Afwisselen mag nooit een plek kosten: plaatst Nee meer studenten, dan geldt dat rooster.
+        km = "Nee"
+        nee = plan()
+        if len(nee) > len(toegewezen):
+            meldingen.append(("Waarschuwing", "Klassen mengen: de klassen zijn voor dit rooster niet gemengd, omdat anders "
+                              f"{len(nee) - len(toegewezen)} student(en) geen plek hadden gekregen."))
+            toegewezen = nee
+        else:
+            km = "Afwisselen"
+            toegewezen = plan()  # opnieuw, zodat de bezetting (voor de vrije plekken) bij dit rooster hoort
 
     vrije = []
     if s["vrije_plekken"] == "Ja":
@@ -1209,7 +1234,7 @@ def maak_rooster(bladen: dict, modus: str) -> dict:
         tijd = tijd_tekst(r["slot"]["t"])
         uitdraai.append(([st["klas"]] if op_klas else []) +
                         [naam, r["slot"]["lokaal"], f"{datum_tekst(r['slot']['d'])} {tijd}" if s["uitdraai_datum"] == "Ja" else tijd])
-    niet = [st for st in volgorde if st["i"] not in toegewezen]
+    niet = [st for st in doel if st["i"] not in toegewezen]
     for st in sorted(niet, key=lambda x: x["i"]):
         rooster.append(["", "", "", "", "", "", "", "", st["nr"], st["voornaam"], st["tv"], st["achternaam"], st["klas"], NIET])
         meldingen.append(("Waarschuwing", f"{st['voornaam']} {st['achternaam']} is NIET ingeroosterd: geen vrij lokaal, "
