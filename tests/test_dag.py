@@ -148,6 +148,61 @@ def test_sorteren_op_klas():
     assert uitdraai[0] == ["Klas", "Naam", "Lokaal", "Tijd"] and [x[0] for x in uitdraai[1:]] == klassen
 
 
+def per_lokaal(alle):
+    """Per lokaal de rijen op tijd (zonder NIET INGEROOSTERD)."""
+    uit: dict = {}
+    for x in sorted((x for x in alle if x["bijzheden"] != rc.NIET), key=lambda x: x["Tijd"]):
+        uit.setdefault(x["Lokaal"], []).append(x)
+    return uit
+
+
+def test_klassen_mengen_laatste_klas_niet_bij_een_beoordelaar():
+    # Melding van een gebruiker: het blad Studenten staat op klas, de laatste klas mag niet bij Dirk (C1.23-2).
+    def alleen_dirk(klas_mengen):
+        def wijzig(b):
+            for rij in b["Studenten"][1:62]:
+                rij[5], rij[6] = ("Dirk", "") if rij[4] == "P2C" else ("", "")
+            met(klas_mengen=klas_mengen)(b)
+        return wijzig
+
+    def leeg_aan_het_eind(klas_mengen):
+        uit = {}
+        for lok, xs in per_lokaal(rijen(plan(wijzig=alleen_dirk(klas_mengen)))).items():
+            studenten = [i for i, x in enumerate(xs) if x["bijzheden"] != rc.VRIJ]
+            uit[lok] = (len(studenten), len(xs) - 1 - studenten[-1])
+        return uit
+    nee, afwisselen = leeg_aan_het_eind("Nee"), leeg_aan_het_eind("Afwisselen")
+    # Nee: Dirk krijgt 9 studenten en houdt 8 lege plekken aan het eind, de andere lokalen 4.
+    assert nee["C1.23-2"] == (9, 8) and all(nee[lok] == (13, 4) for lok in ("C1.33-1", "C1.33-2", "C1.23-1"))
+    # Afwisselen: Dirk krijgt evenveel als de rest.
+    assert afwisselen["C1.23-2"] == (12, 5) and all(afwisselen[lok][0] >= 12 for lok in ("C1.33-1", "C1.33-2", "C1.23-1"))
+
+
+def test_klassen_mengen_standaard():
+    def tel(wijzig=None):
+        alle = rijen(plan(wijzig=wijzig))
+        st = [x for x in alle if x["bijzheden"] not in (rc.VRIJ, rc.NIET)]
+        paren = sum(a["klas"] == b["klas"] for xs in per_lokaal(st).values() for a, b in zip(xs, xs[1:]))
+        return len(st), max(x["Tijd"] for x in st), paren
+    nee, afwisselen = tel(met(klas_mengen="Nee")), tel()
+    # Standaard Afwisselen: iedereen een plek, niet later klaar en minder vaak twee uit dezelfde klas na elkaar.
+    assert nee[0] == afwisselen[0] == 61 and afwisselen[1] <= nee[1] and afwisselen[2] < nee[2]
+    # Bram (C1.33-2) mag alleen P2A krijgen: met Nee komt die klas alleen 's ochtends.
+    bram = lambda w: sum(x["Beoordelaar"] == "Bram" and x["bijzheden"] != rc.VRIJ for x in rijen(plan(wijzig=met(klas_mengen=w))))  # noqa: E731
+    assert (bram("Nee"), bram("Afwisselen")) == (5, 12)
+
+
+def test_klassen_mengen_verplicht_lukt_niet():
+    # Bram mag alleen P2A krijgen, dus bij Verplicht hooguit één student: er blijven studenten over.
+    r = plan(wijzig=met(klas_mengen="Verplicht"))
+    niet = [x for x in rijen(r) if x["bijzheden"] == rc.NIET]
+    assert len(niet) == 3 and sum("Klassen mengen: Verplicht" in m[1] for m in r["meldingen"]) == 3
+    for xs in per_lokaal([x for x in rijen(r) if x["bijzheden"] != rc.VRIJ]).values():
+        assert all(a["klas"] != b["klas"] for a, b in zip(xs, xs[1:]))
+    r = plan(wijzig=met(klas_mengen="Afwisselen"))
+    assert not [x for x in rijen(r) if x["bijzheden"] == rc.NIET] and not any("Klassen mengen" in m[1] for m in r["meldingen"])
+
+
 def test_simu_vanaf_tot_en_te_weinig():
     def wim_ochtend(b):
         b["Simu"][5][3] = "12:00"

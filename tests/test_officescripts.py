@@ -272,6 +272,8 @@ SCENARIOS = {
                           her_beo="Verplicht", rooster_sort="Tijd, dan lokaal"),
     "dag_op_klas_met_wissels": dag_met(rooster_sort="Klas, dan tijd", uitdraai_sort="Klas, dan tijd", simu_wissels=2),
     "concept_met_wissels": concept_met(simu_wissels=3, rooster_sort="Tijd, dan lokaal"),
+    "dag_klassen_verplicht": dag_met(klas_mengen="Verplicht"),
+    "dag_klassen_nee": dag_met(klas_mengen="Nee"),
     "dag_krap": dag_krap,
     "dag_fouten": dag_fouten,
     "dag_ongeldige_instellingen": dag_ongeldige_instellingen,

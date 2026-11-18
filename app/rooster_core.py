@@ -70,6 +70,11 @@ INSTELLINGEN = [
           "Evenredig: op elk tijdstip eerst het lokaal met de minste studenten, zodat elk lokaal (en elke beoordelaar) "
           "ongeveer evenveel krijgt, ook als er minder simu's dan lokalen zijn. Op volgorde: eerst de bovenste lokalen.",
           ["Evenredig", "Op volgorde"]),
+    _inst("klas_mengen", "Toetsdag", "Klassen mengen", "keuze", "Afwisselen",
+          "Afwisselen: de klassen om en om inroosteren en in een lokaal liefst geen twee studenten uit dezelfde klas na "
+          "elkaar; dat kost nooit een plek. Verplicht: nooit twee na elkaar; lukt dat niet, dan wordt de student niet "
+          "ingeroosterd (vooral als een beoordelaar maar één klas mag krijgen). Nee: op volgorde van het blad Studenten.",
+          ["Afwisselen", "Verplicht", "Nee"]),
     _inst("jaar", "Toetsduur", "Jaar", "getal", 1, "Studiejaar van deze toets; bepaalt welke duur hieronder geldt.", min_=1, max_=2),
     _inst("duur1", "Toetsduur", "Toetsduur jaar 1 (min)", "getal", 15, "Gewone toets in jaar 1.", min_=1, max_=480),
     _inst("ttv1", "Toetsduur", "TTV-toetsduur jaar 1 (min)", "getal", 20, "Toets met tijdverlenging in jaar 1.", min_=1, max_=480),
@@ -1005,7 +1010,18 @@ def maak_rooster(bladen: dict, modus: str) -> dict:
         simus = simu_rotatie(bruikbaar, simu_dag, s, meldingen)
 
     doel = [st for st in studenten if st["her"] == (modus == HER)]
-    volgorde = sorted(doel, key=lambda st: (0 if s["ttv_eerst"] == "Ja" and st["ttv"] else 1 if st["voorkeur"] else 2, st["i"]))
+    groep = lambda st: 0 if s["ttv_eerst"] == "Ja" and st["ttv"] else 1 if st["voorkeur"] else 2  # noqa: E731
+    # Klassen mengen: per groep om en om uit elke klas (klassen in de volgorde van het blad).
+    mengen = s["klas_mengen"] != "Nee"
+    klassen: dict = {}
+    rang: dict = {}
+    plek: dict = {}
+    for st in doel:
+        klassen.setdefault(norm(st["klas"]), len(klassen))
+        k = (groep(st), norm(st["klas"]))
+        rang[k] = rang.get(k, -1) + 1
+        plek[st["i"]] = (rang[k], klassen[k[1]]) if mengen else (0, 0)
+    volgorde = sorted(doel, key=lambda st: (groep(st), *plek[st["i"]], st["i"]))
     gewoon = sorted(bruikbaar, key=lambda x: (x["d"], x["t"], x["n"]))
     mid = s["middag"]
     per_voorkeur = {
@@ -1061,26 +1077,40 @@ def maak_rooster(bladen: dict, modus: str) -> dict:
 
     aantal: dict = {}  # studenten per lokaal (per dag) tot nu toe
 
-    def geordend(lijst):
-        # 'Evenredig': binnen hetzelfde tijdstip eerst het lokaal met de minste studenten; tijdvolgorde blijft gelijk.
-        if s["verdelen"] != "Evenredig":
+    geplaatst: dict = {}  # (begintijd, klas) van de studenten per lokaal (per dag) tot nu toe
+
+    def andere_buren(slot, st):
+        # De dichtstbijzijnde student ervoor en erna in dit lokaal is niet uit dezelfde klas (zonder klas: altijd goed).
+        rij = geplaatst.get((slot["d"], norm(slot["lokaal"])), [])
+        buren = [max((x for x in rij if x[0] < slot["t"]), default=None), min((x for x in rij if x[0] > slot["t"]), default=None)]
+        return not norm(st["klas"]) or all(x is None or x[1] != norm(st["klas"]) for x in buren)
+
+    def geordend(lijst, st):
+        # Binnen hetzelfde tijdstip eerst een lokaal met andere klassen ernaast ('Afwisselen'), dan het lokaal met de
+        # minste studenten ('Evenredig'); de tijdvolgorde blijft gelijk.
+        afwisselen = s["klas_mengen"] == "Afwisselen"
+        if s["verdelen"] != "Evenredig" and not afwisselen:
             return lijst
         groep: dict = {}
         for x in lijst:
             groep.setdefault((x["d"], x["t"]), len(groep))
-        return sorted(lijst, key=lambda x: (groep[(x["d"], x["t"])], aantal.get((x["d"], norm(x["lokaal"])), 0), x["n"]))
+        return sorted(lijst, key=lambda x: (groep[(x["d"], x["t"])], 0 if not afwisselen or andere_buren(x, st) else 1,
+                                            aantal.get((x["d"], norm(x["lokaal"])), 0) if s["verdelen"] == "Evenredig" else 0, x["n"]))
 
     def probeer(st, strikt):
         duur = s["ttv"] if st["ttv"] else s["duur"]
-        for slot in geordend(ttv_volgorde if st["ttv"] else per_voorkeur[st["voorkeur"]]):
+        for slot in geordend(ttv_volgorde if st["ttv"] else per_voorkeur[st["voorkeur"]], st):
             a, b = slot["t"], slot["t"] + duur
             if not past(slot, a, b, st["ttv"]):
                 continue
             if anders("her_casus", strikt) and st["ec"] and norm(slot["casus"]) == norm(st["ec"]):
                 continue
+            if s["klas_mengen"] == "Verplicht" and not andere_buren(slot, st):
+                continue
             r = boek(slot, a, b, st, strikt)
             if r:
                 aantal[(slot["d"], norm(slot["lokaal"]))] = aantal.get((slot["d"], norm(slot["lokaal"])), 0) + 1
+                geplaatst.setdefault((slot["d"], norm(slot["lokaal"])), []).append((slot["t"], norm(st["klas"])))
                 return r
         return None
 
@@ -1183,7 +1213,8 @@ def maak_rooster(bladen: dict, modus: str) -> dict:
     for st in sorted(niet, key=lambda x: x["i"]):
         rooster.append(["", "", "", "", "", "", "", "", st["nr"], st["voornaam"], st["tv"], st["achternaam"], st["klas"], NIET])
         meldingen.append(("Waarschuwing", f"{st['voornaam']} {st['achternaam']} is NIET ingeroosterd: geen vrij lokaal, "
-                          "beoordelaar of simucliënt gevonden (let ook op uitsluitingen en verplichte herkansingsregels)."))
+                          "beoordelaar of simucliënt gevonden (let ook op uitsluitingen en verplichte herkansingsregels"
+                          + (" en de instelling Klassen mengen: Verplicht" if s["klas_mengen"] == "Verplicht" else "") + ")."))
     if vrije:
         meldingen.append(("Info", f"{len(vrije)} vrije plek(ken) over. Ze staan als '{VRIJ}' in het rooster, "
                           "niet op de uitdraai of in de PDF's."))

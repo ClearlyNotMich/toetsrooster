@@ -42,8 +42,8 @@ HULP = """
   <li>Liever een lijst, zoals op papier? Zet die als extra blad in de werkmap. Zie de README.</li>
   </ul></li>
 <li>Open de werkmap. Download hem eerst uit OneDrive of SharePoint.</li>
-<li>Kijk de instellingen na: tijden, toetsduur, pauzes, wanneer en hoe vaak simu's van lokaal wisselen, en of het
-  rooster per lokaal, per klas of op tijd staat. Het programma onthoudt
+<li>Kijk de instellingen na: tijden, toetsduur, pauzes, wanneer en hoe vaak simu's van lokaal wisselen, of de klassen
+  gemengd worden en of het rooster per lokaal, per klas of op tijd staat. Het programma onthoudt
   ze, ook na afsluiten. Heeft een werkmap andere instellingen, dan kun je die overnemen op de pagina Instellingen.</li>
 <li>Kies Eerste kans of Herkansing en klik op Rooster maken. Kijk daarna bij Meldingen.</li>
 <li>Sla op als Excel, of maak een pdf voor docenten of voor studenten. Je originele bestand blijft ongewijzigd.</li>
@@ -53,7 +53,9 @@ HULP = """
 daarin als je opslaat als Excel. Meer uitleg staat in de README op GitHub.</p>
 <h3>Klopt er iets niet?</h3>
 <p>Een student zonder plek staat onderaan het rooster als NIET INGEROOSTERD. Bij Meldingen staat waarom.
-Vaak zijn er te weinig plekken of simu's, of sluiten de uitsluitingen alle beoordelaars uit. Krijgt een heel lokaal
+Vaak zijn er te weinig plekken of simu's, of sluiten de uitsluitingen alle beoordelaars uit. Staat Klassen mengen
+op Verplicht en mag een beoordelaar maar één klas krijgen, dan blijven er vaak studenten zonder plek. Zet het dan op
+Afwisselen. Krijgt een heel lokaal
 niemand, dan staat bij Meldingen welk lokaal en waarom. Let ook op namen die twee keer in het blad Simu staan.</p>
 """
 

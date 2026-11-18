@@ -55,6 +55,13 @@ Het programma zoekt de kolommen op hun naam. De namen uit het bestaande bestand 
 
 Volgorde: eerst de studenten met TTV, dan die met een voorkeur, dan de rest. Een student zonder plek verdwijnt nooit. Hij staat onderaan het rooster als NIET INGEROOSTERD.
 
+Klassen mengen bepaalt de volgorde binnen die drie groepen:
+- Afwisselen (standaard): om en om een student uit elke klas, in de volgorde waarin de klassen in het blad staan. Zijn er op hetzelfde tijdstip meer lokalen vrij, dan kiest het programma eerst een lokaal waar de student ervoor en erna uit een andere klas komt. Dit kost nooit iemand een plek of een latere tijd.
+- Verplicht: ook om en om, en in een lokaal nooit twee studenten uit dezelfde klas na elkaar. Mag een beoordelaar maar één klas krijgen, dan krijgt hij zo hooguit één student en blijven er vaak studenten over als NIET INGEROOSTERD.
+- Nee: in de volgorde van het blad Studenten. Staat dat blad op klas, dan komt de laatste klas aan het eind van de dag. Mag die klas niet bij een bepaalde beoordelaar, dan blijven zijn laatste plekken leeg.
+
+Studenten zonder klas tellen niet mee bij het mengen. Vrije plekken ook niet.
+
 ## Eerste kans en herkansing
 
 De eerste kans roostert iedereen in die geen herkanser is. Daarna schrijft het programma in het blad Studenten op wanneer en bij wie elke student was.
@@ -129,6 +136,7 @@ Deze staan in het blad Instellingen en op de pagina Instellingen in het programm
 | Toetsdag | Laatste toets klaar om | 17:00 | Geen toets loopt later door dan deze tijd. |
 | Toetsdag | Wisseltijd (min) | 5 | Tijd tussen twee studenten. |
 | Toetsdag | Lokalen vullen | Evenredig | Evenredig: op elk tijdstip eerst het lokaal met de minste studenten, zodat elk lokaal (en elke beoordelaar) ongeveer evenveel krijgt, ook als er minder simu's dan lokalen zijn. Op volgorde: eerst de bovenste lokalen. Keuzes: Evenredig / Op volgorde. |
+| Toetsdag | Klassen mengen | Afwisselen | Afwisselen: de klassen om en om inroosteren en in een lokaal liefst geen twee studenten uit dezelfde klas na elkaar; dat kost nooit een plek. Verplicht: nooit twee na elkaar; lukt dat niet, dan wordt de student niet ingeroosterd (vooral als een beoordelaar maar één klas mag krijgen). Nee: op volgorde van het blad Studenten. Keuzes: Afwisselen / Verplicht / Nee. |
 | Toetsduur | Jaar | 1 | Studiejaar van deze toets; bepaalt welke duur hieronder geldt. |
 | Toetsduur | Toetsduur jaar 1 (min) | 15 | Gewone toets in jaar 1. |
 | Toetsduur | TTV-toetsduur jaar 1 (min) | 20 | Toets met tijdverlenging in jaar 1. |

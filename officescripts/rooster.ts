@@ -1361,7 +1361,21 @@ function maakRooster(bladen: Map<string, Matrix>, modus: string): Resultaat {
 
     const doel: Student[] = studenten.filter((st: Student) => st.her === (modus === "her"));
     const groep = (st: Student): number => (txt("ttv_eerst") === "Ja" && st.ttv ? 0 : st.voorkeur ? 1 : 2);
-    const volgorde: Student[] = doel.slice().sort((a: Student, b: Student) => vergelijk([groep(a), a.i], [groep(b), b.i]));
+    // Klassen mengen: per groep om en om uit elke klas (klassen in de volgorde van het blad).
+    const mengen: boolean = txt("klas_mengen") !== "Nee";
+    const klassen: Map<string, number> = new Map<string, number>();
+    const rang: Map<string, number> = new Map<string, number>();
+    const plek: Map<number, number[]> = new Map<number, number[]>();
+    for (const st of doel) {
+        if (!klassen.has(norm(st.klas))) {
+            klassen.set(norm(st.klas), klassen.size);
+        }
+        const k: string = `${groep(st)}_${norm(st.klas)}`;
+        rang.set(k, (rang.has(k) ? rang.get(k) as number : -1) + 1);
+        plek.set(st.i, mengen ? [rang.get(k) as number, klassen.get(norm(st.klas)) as number] : [0, 0]);
+    }
+    const sleutelSt = (st: Student): number[] => [groep(st)].concat(plek.get(st.i) as number[], [st.i]);
+    const volgorde: Student[] = doel.slice().sort((a: Student, b: Student) => vergelijk(sleutelSt(a), sleutelSt(b)));
     const gewoon: Slot[] = bruikbaar.slice().sort((a: Slot, b: Slot) => vergelijk([a.d, a.t, a.n], [b.d, b.t, b.n]));
     const mid: number = num("middag");
     const sorteer = (sleutel: (x: Slot) => number[]): Slot[] =>
@@ -1431,9 +1445,26 @@ function maakRooster(bladen: Map<string, Matrix>, modus: string): Resultaat {
     };
 
     const aantal: Map<string, number> = new Map<string, number>(); // studenten per lokaal (per dag) tot nu toe
-    // 'Evenredig': binnen hetzelfde tijdstip eerst het lokaal met de minste studenten; tijdvolgorde blijft gelijk.
-    const geordend = (lijst: Slot[]): Slot[] => {
-        if (txt("verdelen") !== "Evenredig") {
+    const geplaatst: Map<string, Toewijzing[]> = new Map<string, Toewijzing[]>(); // studenten per lokaal (per dag) tot nu toe
+    // De dichtstbijzijnde student ervoor en erna in dit lokaal is niet uit dezelfde klas (zonder klas: altijd goed).
+    const andereBuren = (slot: Slot, st: Student): boolean => {
+        let voor: Toewijzing | null = null;
+        let na: Toewijzing | null = null;
+        for (const x of geplaatst.get(`${slot.d}_${norm(slot.lokaal)}`) || []) {
+            if (x.slot.t < slot.t && (voor === null || x.slot.t > voor.slot.t)) {
+                voor = x;
+            }
+            if (x.slot.t > slot.t && (na === null || x.slot.t < na.slot.t)) {
+                na = x;
+            }
+        }
+        return !norm(st.klas) || [voor, na].every((x: Toewijzing | null) => x === null || norm((x.st as Student).klas) !== norm(st.klas));
+    };
+    // Binnen hetzelfde tijdstip eerst een lokaal met andere klassen ernaast ('Afwisselen'), dan het lokaal met de
+    // minste studenten ('Evenredig'); de tijdvolgorde blijft gelijk.
+    const geordend = (lijst: Slot[], st: Student): Slot[] => {
+        const afwisselen: boolean = txt("klas_mengen") === "Afwisselen";
+        if (txt("verdelen") !== "Evenredig" && !afwisselen) {
             return lijst;
         }
         const groep: Map<string, number> = new Map<string, number>();
@@ -1442,14 +1473,14 @@ function maakRooster(bladen: Map<string, Matrix>, modus: string): Resultaat {
                 groep.set(`${x.d}_${x.t}`, groep.size);
             }
         });
-        const sleutel = (x: Slot): number[] => [groep.get(`${x.d}_${x.t}`) as number,
-            aantal.get(`${x.d}_${norm(x.lokaal)}`) || 0, x.n];
+        const sleutel = (x: Slot): number[] => [groep.get(`${x.d}_${x.t}`) as number, !afwisselen || andereBuren(x, st) ? 0 : 1,
+            txt("verdelen") === "Evenredig" ? aantal.get(`${x.d}_${norm(x.lokaal)}`) || 0 : 0, x.n];
         return lijst.slice().sort((a: Slot, b: Slot) => vergelijk(sleutel(a), sleutel(b)));
     };
 
     const probeer = (st: Student, strikt: boolean): Toewijzing | null => {
         const duur: number = st.ttv ? duurTtv : duurNormaal;
-        for (const slot of geordend(st.ttv ? ttvVolgorde : perVoorkeur.get(st.voorkeur) as Slot[])) {
+        for (const slot of geordend(st.ttv ? ttvVolgorde : perVoorkeur.get(st.voorkeur) as Slot[], st)) {
             const a: number = slot.t;
             const b: number = slot.t + duur;
             if (!past(slot, a, b, st.ttv)) {
@@ -1458,9 +1489,16 @@ function maakRooster(bladen: Map<string, Matrix>, modus: string): Resultaat {
             if (anders("her_casus", strikt) && st.ec && norm(slot.casus) === norm(st.ec)) {
                 continue;
             }
+            if (txt("klas_mengen") === "Verplicht" && !andereBuren(slot, st)) {
+                continue;
+            }
             const r: Toewijzing | null = boek(slot, a, b, st, strikt);
             if (r) {
                 aantal.set(`${slot.d}_${norm(slot.lokaal)}`, (aantal.get(`${slot.d}_${norm(slot.lokaal)}`) || 0) + 1);
+                if (!geplaatst.has(`${slot.d}_${norm(slot.lokaal)}`)) {
+                    geplaatst.set(`${slot.d}_${norm(slot.lokaal)}`, []);
+                }
+                (geplaatst.get(`${slot.d}_${norm(slot.lokaal)}`) as Toewijzing[]).push(r);
                 return r;
             }
         }
@@ -1613,7 +1651,8 @@ function maakRooster(bladen: Map<string, Matrix>, modus: string): Resultaat {
     for (const st of niet) {
         rooster.push(["", "", "", "", "", "", "", "", st.nr, st.voornaam, st.tv, st.achternaam, st.klas, NIET]);
         meldingen.push(["Waarschuwing", `${st.voornaam} ${st.achternaam} is NIET ingeroosterd: geen vrij lokaal, ` +
-            "beoordelaar of simucliënt gevonden (let ook op uitsluitingen en verplichte herkansingsregels)."]);
+            "beoordelaar of simucliënt gevonden (let ook op uitsluitingen en verplichte herkansingsregels" +
+            (txt("klas_mengen") === "Verplicht" ? " en de instelling Klassen mengen: Verplicht" : "") + ")."]);
     }
     if (vrije.length > 0) {
         meldingen.push(["Info", `${vrije.length} vrije plek(ken) over. Ze staan als '${VRIJ}' in het rooster, ` +

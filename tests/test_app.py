@@ -159,7 +159,8 @@ def test_vrije_plekken_niet_in_pdf(tmp_path):
     html = uitvoer.html_rooster("t", rooster) + uitvoer.html_uitdraai("t", r["bladen"]["Uitdraai_Kans1"])
     # 5 lokaalpagina's met kop en per lokaal de pauzes tussen de toetsen, 1 uitdraaikop
     assert rc.VRIJ not in html and html.count("<tr>") == 61 + 61 + 5 + 1 + html.count(f"<td>{rc.PAUZE}</td>")
-    assert html.count(f"<td>{rc.PAUZE}</td>") == 12 and "<td>11:15–11:40</td><td>Pauze</td>" in html
+    # Met Klassen mengen is de laatste toets om 15:00, dus per lokaal alleen de eerste twee pauzes.
+    assert html.count(f"<td>{rc.PAUZE}</td>") == 10 and "<td>11:15–11:40</td><td>Pauze</td>" in html
 
 
 def test_concept_in_werkmap_en_import_zonder_passende_kolom(tmp_path):

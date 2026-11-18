@@ -1,11 +1,12 @@
-"""Maakt de twee Office Scripts (.txt) uit officescripts/rooster.ts. `--check`: faalt als ze verouderd zijn."""
+"""Maakt de twee Office Scripts (.txt) uit officescripts/rooster.ts en de tabel met instellingen in docs/REGELS.md.
+`--check`: faalt als ze verouderd zijn."""
 import json
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "app"))
-from rooster_core import INSTELLINGEN  # noqa: E402
+from rooster_core import INSTELLINGEN, toelichting  # noqa: E402
 DOELEN = {
     "OWB Exam Roster Generator.txt": {"__MODUS__": "kans1", "__MODUS_NAAM__": "EERSTE KANS", "__SLOTS__": "Slots_Kans1", "__DAG__": "Toetsdag_Kans1",
         "__ROOSTER__": "Rooster_Kans1", "__UITDRAAI__": "Uitdraai_Kans1",
@@ -24,10 +25,18 @@ def inhoud(vervang: dict) -> str:
     return tekst
 
 
+def regels() -> str:
+    # Alles na de markering in docs/REGELS.md is de tabel met instellingen.
+    markering = "<!-- tabel: gegenereerd uit rooster_core.INSTELLINGEN -->\n"
+    tekst = (ROOT / "docs" / "REGELS.md").read_text(encoding="utf-8")
+    rijen = [f"| {i['groep']} | {i['label']} | {i['standaard']} | {toelichting(i) or 'Naam van het blad.'} |\n" for i in INSTELLINGEN]
+    return tekst[:tekst.index(markering) + len(markering)] + "| Groep | Instelling | Standaard | Uitleg |\n|---|---|---|---|\n" + "".join(rijen)
+
+
 if __name__ == "__main__":
     fout = False
-    for naam, vervang in DOELEN.items():
-        pad, nieuw = ROOT / naam, inhoud(vervang)
+    for naam, nieuw in [*((naam, inhoud(vervang)) for naam, vervang in DOELEN.items()), ("docs/REGELS.md", regels())]:
+        pad = ROOT / naam
         if "--check" in sys.argv:
             if not pad.exists() or pad.read_text(encoding="utf-8") != nieuw:
                 print(f"VEROUDERD: {naam} (draai python tools/bouw_scripts.py)")

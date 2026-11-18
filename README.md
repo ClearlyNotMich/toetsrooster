@@ -35,6 +35,8 @@ Vast lokaal bepaalt of een simu van lokaal wisselt. Leeg betekent dat de simu me
 
 Dit blad maakt het programma zelf aan. Hier staan onder meer de begin- en eindtijd, de pauzes en de toetsduur (standaard 15 minuten, 20 met TTV). Je stelt hier ook in of simu's na elke pauze, na elke toets of nooit van lokaal wisselen, hoe vaak ze tussen twee pauzes nog wisselen, en of de lokalen evenredig gevuld worden zodat iedere beoordelaar studenten krijgt. Dat laatste staat standaard aan.
 
+Bij Klassen mengen kies je of de klassen door elkaar worden ingeroosterd. Bij Afwisselen, de standaard, gaat het programma om en om de klassen langs en zet het in een lokaal liefst geen twee studenten uit dezelfde klas na elkaar. Daardoor blijft er aan het eind van de dag geen klas over die bij een bepaalde beoordelaar niet mag. Afwisselen kost nooit iemand een plek. Bij Verplicht komen er nooit twee studenten uit dezelfde klas na elkaar. Mag een beoordelaar maar één klas krijgen, dan lukt dat vaak niet en komen er studenten als NIET INGEROOSTERD in het rooster. Bij Nee gaat het in de volgorde van het blad Studenten.
+
 ## Wat eruit komt
 
 - Rooster_Kans1 en Rooster_Her: het complete rooster per lokaal, per klas of op tijd (dat kies je bij Instellingen). Begin- en eindtijd staan naast elkaar, tussen de toetsen staat een rij Pauze en lege plekken staan erin als Vrije plek.
