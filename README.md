@@ -98,4 +98,5 @@ Let op: de toetsduur voor jaar 2 staat standaard gelijk aan die van jaar 1. Pas 
   ```
 
 - Bouwen doe je met `pyinstaller roosterapp.spec`. Bij elke push naar `main` bouwt GitHub zelf de versies voor Windows en Linux.
+- Een release maak je, na de push naar `main`, met `tools/release.sh vX.Y.Z notities.md`. Het script wacht op de build, test het programma en zet de bestanden op GitHub.
 - Zet nooit echte werkmappen met studentgegevens in deze repository. De voorbeeldwerkmap bevat verzonnen gegevens.
